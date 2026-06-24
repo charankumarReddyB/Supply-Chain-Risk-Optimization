@@ -1191,21 +1191,35 @@ const activityMeta = {
   info: { Icon: Activity, color: "text-blue-500", bg: "bg-blue-50" },
 };
 
-const DashboardPage = ({ onNavigate }: { onNavigate: (p: Page) => void }) => {
+const DashboardPage = ({ onNavigate, user }: { onNavigate: (p: Page) => void; user: any }) => {
   const [showAlerts, setShowAlerts] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   const loadStats = useCallback(async () => {
     try {
-      const data = await apiService.dashboard.getStats();
-      setStats(data);
+      const isAdmin = user?.role === "admin";
+      if (isAdmin) {
+        const data = await apiService.dashboard.getStats();
+        setStats(data);
+      } else {
+        const kpis = await apiService.dashboard.getKPIs();
+        const inventory = await apiService.dashboard.getInventoryStatus();
+        setStats({
+          kpis: kpis,
+          inventory_status: inventory,
+          monthly_sales_trend: [],
+          risk_distribution: [],
+          supplier_ranking: [],
+          recent_activities: []
+        });
+      }
     } catch (err: any) {
       showToast("error", "Failed to load dashboard statistics");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     loadStats();
@@ -1337,7 +1351,9 @@ const DashboardPage = ({ onNavigate }: { onNavigate: (p: Page) => void }) => {
         style={{ background: "linear-gradient(135deg, #1e3a8a 0%, #2563eb 60%, #3b82f6 100%)" }}
       >
         <div>
-          <h2 className="text-xl font-bold mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Good morning, Alex!</h2>
+          <h2 className="text-xl font-bold mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>
+            Good morning, {user?.full_name || user?.username || "User"}!
+          </h2>
           <p className="text-blue-200 text-sm">
             Real-time analytics and optimizations are loaded and active. Review key supply chain metrics below.
           </p>
@@ -1346,9 +1362,11 @@ const DashboardPage = ({ onNavigate }: { onNavigate: (p: Page) => void }) => {
           <button onClick={() => setShowAlerts(true)} className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl text-sm font-medium transition-colors border border-white/30">
             View Alerts
           </button>
-          <button onClick={() => onNavigate("risk")} className="px-4 py-2 bg-white text-blue-900 hover:bg-blue-50 rounded-xl text-sm font-semibold transition-colors">
-            Risk Report
-          </button>
+          {user?.role === "admin" && (
+            <button onClick={() => onNavigate("risk")} className="px-4 py-2 bg-white text-blue-900 hover:bg-blue-50 rounded-xl text-sm font-semibold transition-colors">
+              Risk Report
+            </button>
+          )}
         </div>
       </div>
 
@@ -3167,18 +3185,18 @@ export default function App() {
   const renderPage = () => {
     const isAdmin = user?.role === "admin";
     switch (page) {
-      case "dashboard": return <DashboardPage key={pageKey} onNavigate={navigate} />;
+      case "dashboard": return <DashboardPage key={pageKey} onNavigate={navigate} user={user} />;
       case "suppliers": return <SuppliersPage key={pageKey} />;
       case "inventory": return <InventoryPage key={pageKey} />;
       case "orders": return <OrdersPage key={pageKey} />;
       case "risk": 
-        if (!isAdmin) return <DashboardPage key={pageKey} onNavigate={navigate} />;
+        if (!isAdmin) return <DashboardPage key={pageKey} onNavigate={navigate} user={user} />;
         return <RiskPage key={pageKey} />;
       case "optimization":
-        if (!isAdmin) return <DashboardPage key={pageKey} onNavigate={navigate} />;
+        if (!isAdmin) return <DashboardPage key={pageKey} onNavigate={navigate} user={user} />;
         return <OptimizationPage key={pageKey} />;
       case "reports":
-        if (!isAdmin) return <DashboardPage key={pageKey} onNavigate={navigate} />;
+        if (!isAdmin) return <DashboardPage key={pageKey} onNavigate={navigate} user={user} />;
         return <ReportsPage key={pageKey} />;
       case "profile": return <ProfilePage key={pageKey} user={user} onProfileUpdate={handleProfileUpdate} />;
     }
