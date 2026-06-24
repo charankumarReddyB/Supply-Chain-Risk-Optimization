@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { apiService } from "../services/apiService";
 import {
   LayoutDashboard, Building2, Package, ShoppingCart,
   AlertTriangle, TrendingUp, BarChart3, Settings, User,
@@ -140,21 +141,74 @@ const ViewSupplierModal = ({ supplier, onClose }: { supplier: typeof suppliers[0
   </Modal>
 );
 
-const EditSupplierModal = ({ supplier, onClose }: { supplier: typeof suppliers[0]; onClose: () => void }) => {
-  const [form, setForm] = useState({ name: supplier.name, country: supplier.country, category: supplier.category });
+const EditSupplierModal = ({ supplier, onClose, onSuccess }: { supplier: DbSupplier; onClose: () => void; onSuccess?: () => void }) => {
+  const [form, setForm] = useState({
+    name: supplier.name || "",
+    email: supplier.email || "",
+    phone: supplier.phone || "",
+    rating: String(supplier.rating || "5.0"),
+    status: supplier.status || "Active"
+  });
+  const [loading, setLoading] = useState(false);
+
+  const handleSave = async () => {
+    if (!form.name.trim()) { showToast("error", "Supplier name is required"); return; }
+    setLoading(true);
+    try {
+      await apiService.suppliers.update(supplier.supplier_id, {
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        rating: parseFloat(form.rating) || 5.0,
+        status: form.status,
+      });
+      showToast("success", `${form.name} updated successfully`);
+      onSuccess?.();
+      onClose();
+    } catch (err: any) {
+      showToast("error", err.message || "Failed to update supplier");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Modal title="Edit Supplier" onClose={onClose}>
       <div className="space-y-4">
-        {(["name", "country", "category"] as const).map((field) => (
-          <div key={field}>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{field}</label>
-            <input value={form[field]} onChange={(e) => setForm((p) => ({ ...p, [field]: e.target.value }))}
-              className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25 transition-all" />
-          </div>
-        ))}
+        <div>
+          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Supplier Name</label>
+          <input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+            className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25 transition-all" />
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Contact Email</label>
+          <input value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+            className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25 transition-all" />
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Phone</label>
+          <input value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
+            className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25 transition-all" />
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Rating (1-5)</label>
+          <input value={form.rating} onChange={(e) => setForm((p) => ({ ...p, rating: e.target.value }))}
+            className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25 transition-all" />
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Status</label>
+          <select value={form.status} onChange={(e) => setForm(p => ({ ...p, status: e.target.value }))}
+            className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25">
+            <option value="Active">Active</option>
+            <option value="Review">Review</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+        </div>
         <div className="flex gap-2 pt-2">
-          <button onClick={() => { showToast("success", `${form.name} updated successfully`); onClose(); }}
-            className="flex-1 py-2.5 bg-blue-900 text-white rounded-xl text-sm font-semibold hover:bg-blue-800 transition-colors">Save Changes</button>
+          <button onClick={handleSave} disabled={loading}
+            className="flex-1 py-2.5 bg-blue-900 text-white rounded-xl text-sm font-semibold hover:bg-blue-800 transition-colors disabled:opacity-60">
+            {loading ? "Saving..." : "Save Changes"}
+          </button>
           <button onClick={onClose} className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-200 transition-colors">Cancel</button>
         </div>
       </div>
@@ -162,14 +216,37 @@ const EditSupplierModal = ({ supplier, onClose }: { supplier: typeof suppliers[0
   );
 };
 
-const AddSupplierModal = ({ onClose }: { onClose: () => void }) => {
-  const [form, setForm] = useState({ name: "", country: "", category: "", contact: "" });
+const AddSupplierModal = ({ onClose, onSuccess }: { onClose: () => void; onSuccess?: () => void }) => {
+  const [form, setForm] = useState({ supplier_id: "", name: "", email: "", phone: "", rating: "5.0", status: "Active" });
+  const [loading, setLoading] = useState(false);
   const fields: { key: keyof typeof form; label: string; placeholder: string }[] = [
+    { key: "supplier_id", label: "Supplier ID (optional unique number)", placeholder: "e.g. 201 (blank to auto-generate)" },
     { key: "name", label: "Supplier Name", placeholder: "e.g. Acme Manufacturing" },
-    { key: "country", label: "Country", placeholder: "e.g. USA" },
-    { key: "category", label: "Category", placeholder: "e.g. Electronics" },
-    { key: "contact", label: "Contact Email", placeholder: "contact@supplier.com" },
+    { key: "email", label: "Contact Email", placeholder: "contact@supplier.com" },
+    { key: "phone", label: "Phone", placeholder: "+1 555-000-0000" },
+    { key: "rating", label: "Rating (1-5)", placeholder: "5.0" },
   ];
+  const handleAdd = async () => {
+    if (!form.name.trim()) { showToast("error", "Supplier Name is required"); return; }
+    setLoading(true);
+    try {
+      await apiService.suppliers.create({
+        supplier_id: form.supplier_id.trim() ? parseInt(form.supplier_id) : undefined,
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        rating: parseFloat(form.rating) || 5.0,
+        status: form.status,
+      });
+      showToast("success", `${form.name} added successfully`);
+      onSuccess?.();
+      onClose();
+    } catch (err: any) {
+      showToast("error", err.message || "Failed to add supplier");
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <Modal title="Add New Supplier" onClose={onClose}>
       <div className="space-y-4">
@@ -181,12 +258,20 @@ const AddSupplierModal = ({ onClose }: { onClose: () => void }) => {
               className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25 transition-all" />
           </div>
         ))}
+        <div>
+          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Status</label>
+          <select value={form.status} onChange={(e) => setForm(p => ({ ...p, status: e.target.value }))}
+            className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25">
+            <option value="Active">Active</option>
+            <option value="Review">Review</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+        </div>
         <div className="flex gap-2 pt-2">
-          <button onClick={() => {
-            if (!form.name.trim()) { showToast("error", "Supplier name is required"); return; }
-            showToast("success", `${form.name} added successfully`);
-            onClose();
-          }} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-colors">Add Supplier</button>
+          <button onClick={handleAdd} disabled={loading}
+            className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-60">
+            {loading ? "Adding..." : "Add Supplier"}
+          </button>
           <button onClick={onClose} className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-200 transition-colors">Cancel</button>
         </div>
       </div>
@@ -194,13 +279,39 @@ const AddSupplierModal = ({ onClose }: { onClose: () => void }) => {
   );
 };
 
-const AddProductModal = ({ onClose }: { onClose: () => void }) => {
-  const [form, setForm] = useState({ name: "", category: "", stock: "", price: "" });
+const AddProductModal = ({ onClose, onSuccess }: { onClose: () => void; onSuccess?: () => void }) => {
+  const [form, setForm] = useState({ product_id: "", product_name: "", category_id: "1", category_name: "", product_price: "", description: "" });
+  const [loading, setLoading] = useState(false);
+  const handleAdd = async () => {
+    if (!form.product_name.trim() || !form.product_price.trim()) {
+      showToast("error", "Product Name and Price are required"); return;
+    }
+    setLoading(true);
+    try {
+      await apiService.products.create({
+        product_id: form.product_id.trim() ? parseInt(form.product_id) : undefined,
+        category_id: parseInt(form.category_id) || 1,
+        category_name: form.category_name || "General",
+        product_name: form.product_name,
+        product_price: parseFloat(form.product_price),
+        description: form.description,
+      });
+      showToast("success", `${form.product_name} added to database successfully`);
+      onSuccess?.();
+      onClose();
+    } catch (err: any) {
+      showToast("error", err.message || "Failed to add product");
+    } finally {
+      setLoading(false);
+    }
+  };
   const fields: { key: keyof typeof form; label: string; placeholder: string }[] = [
-    { key: "name", label: "Product Name", placeholder: "e.g. Control Panel Board" },
-    { key: "category", label: "Category", placeholder: "e.g. Electronics" },
-    { key: "stock", label: "Initial Stock Qty", placeholder: "e.g. 100" },
-    { key: "price", label: "Unit Price ($)", placeholder: "e.g. 299.99" },
+    { key: "product_id", label: "Product ID (optional unique number)", placeholder: "e.g. 1101 (blank to auto-generate)" },
+    { key: "product_name", label: "Product Name", placeholder: "e.g. Control Panel Board" },
+    { key: "category_name", label: "Category Name", placeholder: "e.g. Electronics" },
+    { key: "category_id", label: "Category ID", placeholder: "e.g. 1" },
+    { key: "product_price", label: "Unit Price ($)", placeholder: "e.g. 299.99" },
+    { key: "description", label: "Description (optional)", placeholder: "Product description..." },
   ];
   return (
     <Modal title="Add New Product" onClose={onClose}>
@@ -214,11 +325,10 @@ const AddProductModal = ({ onClose }: { onClose: () => void }) => {
           </div>
         ))}
         <div className="flex gap-2 pt-2">
-          <button onClick={() => {
-            if (!form.name.trim()) { showToast("error", "Product name is required"); return; }
-            showToast("success", `${form.name} added to inventory`);
-            onClose();
-          }} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-colors">Add Product</button>
+          <button onClick={handleAdd} disabled={loading}
+            className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-60">
+            {loading ? "Adding..." : "Add Product"}
+          </button>
           <button onClick={onClose} className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-200 transition-colors">Cancel</button>
         </div>
       </div>
@@ -226,43 +336,170 @@ const AddProductModal = ({ onClose }: { onClose: () => void }) => {
   );
 };
 
-const NewOrderModal = ({ onClose }: { onClose: () => void }) => {
-  const [form, setForm] = useState({ supplier: "", product: "", qty: "", eta: "" });
+const EditInventoryModal = ({ item, product, onClose, onSuccess }: { item: DbInventory; product: DbProduct; onClose: () => void; onSuccess?: () => void }) => {
+  const [form, setForm] = useState({
+    product_name: product.product_name || "",
+    product_price: String(product.product_price || ""),
+    category_name: product.category_name || "",
+    stock_level: String(item.stock_level || "0"),
+    reorder_point: String(item.reorder_point || "50"),
+    safety_stock: String(item.safety_stock || "10"),
+    lead_time_days: String(item.lead_time_days || "5"),
+  });
+  const [loading, setLoading] = useState(false);
+
+  const handleSave = async () => {
+    if (!form.product_name.trim() || !form.product_price.trim()) {
+      showToast("error", "Product name and price are required"); return;
+    }
+    setLoading(true);
+    try {
+      // 1. Update product details (OLTP + OLAP)
+      await apiService.products.update(item.product_id, {
+        product_name: form.product_name,
+        product_price: parseFloat(form.product_price),
+        category_name: form.category_name,
+      });
+
+      // 2. Update inventory details
+      await apiService.inventory.update(item.inventory_id, {
+        stock_level: parseInt(form.stock_level) || 0,
+        reorder_point: parseInt(form.reorder_point) || 0,
+        safety_stock: parseInt(form.safety_stock) || 0,
+        lead_time_days: parseInt(form.lead_time_days) || 0,
+      });
+
+      showToast("success", "Product and inventory updated successfully");
+      onSuccess?.();
+      onClose();
+    } catch (err: any) {
+      showToast("error", err.message || "Failed to update product details");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal title="Edit Product & Inventory" onClose={onClose}>
+      <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+        <div>
+          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Product Name</label>
+          <input value={form.product_name} onChange={(e) => setForm((p) => ({ ...p, product_name: e.target.value }))}
+            className="w-full px-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25 transition-all" />
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Category Name</label>
+          <input value={form.category_name} onChange={(e) => setForm((p) => ({ ...p, category_name: e.target.value }))}
+            className="w-full px-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25 transition-all" />
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Unit Price ($)</label>
+          <input value={form.product_price} onChange={(e) => setForm((p) => ({ ...p, product_price: e.target.value }))}
+            className="w-full px-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25 transition-all" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Stock Level</label>
+            <input type="number" value={form.stock_level} onChange={(e) => setForm((p) => ({ ...p, stock_level: e.target.value }))}
+              className="w-full px-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Reorder Point</label>
+            <input type="number" value={form.reorder_point} onChange={(e) => setForm((p) => ({ ...p, reorder_point: e.target.value }))}
+              className="w-full px-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Safety Stock</label>
+            <input type="number" value={form.safety_stock} onChange={(e) => setForm((p) => ({ ...p, safety_stock: e.target.value }))}
+              className="w-full px-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Lead Time (Days)</label>
+            <input type="number" value={form.lead_time_days} onChange={(e) => setForm((p) => ({ ...p, lead_time_days: e.target.value }))}
+              className="w-full px-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25" />
+          </div>
+        </div>
+        <div className="flex gap-2 pt-2">
+          <button onClick={handleSave} disabled={loading}
+            className="flex-1 py-2.5 bg-blue-900 text-white rounded-xl text-sm font-semibold hover:bg-blue-800 transition-colors disabled:opacity-60">
+            {loading ? "Saving..." : "Save Changes"}
+          </button>
+          <button onClick={onClose} className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-200 transition-colors">Cancel</button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+const NewOrderModal = ({ onClose, onSuccess }: { onClose: () => void; onSuccess?: () => void }) => {
+  const [form, setForm] = useState({ customer_id: "", product_id: "", quantity: "1", sales: "", profit: "", payment_type: "DEBIT", order_status: "PENDING", shipping_mode: "Standard Class", days_shipment_scheduled: "4" });
+  const [loading, setLoading] = useState(false);
+  const handlePlace = async () => {
+    if (!form.customer_id.trim() || !form.product_id.trim() || !form.sales.trim()) {
+      showToast("error", "Customer ID, Product ID, and Sales are required"); return;
+    }
+    setLoading(true);
+    try {
+      const res = await apiService.orders.create({
+        customer_id: parseInt(form.customer_id),
+        product_id: parseInt(form.product_id),
+        quantity: parseInt(form.quantity) || 1,
+        sales: parseFloat(form.sales),
+        profit: parseFloat(form.profit) || 0,
+        order_status: form.order_status,
+        payment_type: form.payment_type,
+        shipping_mode: form.shipping_mode,
+        days_shipment_scheduled: parseInt(form.days_shipment_scheduled) || 4,
+      });
+      showToast("success", `Order placed successfully! ID: ${res?.order_id || ""}`);
+      onSuccess?.();
+      onClose();
+    } catch (err: any) {
+      showToast("error", err.message || "Failed to place order");
+    } finally {
+      setLoading(false);
+    }
+  };
+  const textFields: { key: keyof typeof form; label: string; placeholder: string; type?: string }[] = [
+    { key: "customer_id", label: "Customer ID", placeholder: "e.g. 1" },
+    { key: "product_id", label: "Product ID", placeholder: "e.g. 101" },
+    { key: "quantity", label: "Quantity", placeholder: "e.g. 10", type: "number" },
+    { key: "sales", label: "Sales Amount ($)", placeholder: "e.g. 1500.00", type: "number" },
+    { key: "profit", label: "Profit ($)", placeholder: "e.g. 300.00", type: "number" },
+    { key: "days_shipment_scheduled", label: "Scheduled Shipping Days", placeholder: "e.g. 4", type: "number" },
+  ];
   return (
     <Modal title="Create New Order" onClose={onClose}>
       <div className="space-y-4">
+        {textFields.map((f) => (
+          <div key={f.key}>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{f.label}</label>
+            <input type={f.type || "text"} value={form[f.key]} onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))}
+              placeholder={f.placeholder}
+              className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25" />
+          </div>
+        ))}
         <div>
-          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Supplier</label>
-          <select value={form.supplier} onChange={(e) => setForm((p) => ({ ...p, supplier: e.target.value }))}
+          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Payment Type</label>
+          <select value={form.payment_type} onChange={(e) => setForm(p => ({ ...p, payment_type: e.target.value }))}
             className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25">
-            <option value="">Select supplier...</option>
-            {suppliers.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
+            {["DEBIT","CASH","PAYMENT","TRANSFER"].map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
         <div>
-          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Product</label>
-          <select value={form.product} onChange={(e) => setForm((p) => ({ ...p, product: e.target.value }))}
+          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Shipping Mode</label>
+          <select value={form.shipping_mode} onChange={(e) => setForm(p => ({ ...p, shipping_mode: e.target.value }))}
             className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25">
-            <option value="">Select product...</option>
-            {products.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
+            {["Standard Class","First Class","Second Class","Same Day"].map(m => <option key={m} value={m}>{m}</option>)}
           </select>
-        </div>
-        <div>
-          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Quantity</label>
-          <input type="number" value={form.qty} onChange={(e) => setForm((p) => ({ ...p, qty: e.target.value }))} placeholder="e.g. 50"
-            className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25" />
-        </div>
-        <div>
-          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Expected Delivery Date</label>
-          <input type="date" value={form.eta} onChange={(e) => setForm((p) => ({ ...p, eta: e.target.value }))}
-            className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25" />
         </div>
         <div className="flex gap-2 pt-2">
-          <button onClick={() => {
-            if (!form.supplier || !form.product || !form.qty) { showToast("error", "Please fill all required fields"); return; }
-            showToast("success", `Order placed for ${form.product} from ${form.supplier}`);
-            onClose();
-          }} className="flex-1 py-2.5 bg-blue-900 text-white rounded-xl text-sm font-semibold hover:bg-blue-800 transition-colors">Place Order</button>
+          <button onClick={handlePlace} disabled={loading}
+            className="flex-1 py-2.5 bg-blue-900 text-white rounded-xl text-sm font-semibold hover:bg-blue-800 transition-colors disabled:opacity-60">
+            {loading ? "Placing..." : "Place Order"}
+          </button>
           <button onClick={onClose} className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-200 transition-colors">Cancel</button>
         </div>
       </div>
@@ -428,6 +665,12 @@ const statusColor: Record<string, string> = {
   "In Stock": "bg-emerald-100 text-emerald-700",
   "Low Stock": "bg-amber-100 text-amber-700",
   "Out of Stock": "bg-red-100 text-red-700",
+  COMPLETE: "bg-emerald-100 text-emerald-700",
+  CLOSED: "bg-slate-100 text-slate-700",
+  PROCESSING: "bg-indigo-100 text-indigo-700",
+  PENDING: "bg-amber-100 text-amber-700",
+  ON_HOLD: "bg-orange-100 text-orange-700",
+  CANCELED: "bg-red-100 text-red-700",
 };
 
 const Badge = ({ label, colorClass }: { label: string; colorClass: string }) => (
@@ -504,10 +747,28 @@ const tooltipStyle = {
 // ─── Login Page ───────────────────────────────────────────────────────────────
 
 const LoginPage = ({ onLogin }: { onLogin: () => void }) => {
-  const [email, setEmail] = useState("admin@chainflow.io");
-  const [password, setPassword] = useState("SecurePass2024");
+  const [email, setEmail] = useState("admin@supplychain.com");
+  const [password, setPassword] = useState("admin123");
   const [showPass, setShowPass] = useState(false);
   const [remember, setRemember] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleLoginSubmit = async () => {
+    if (!email.trim() || !password.trim()) {
+      showToast("error", "Username/Email and Password are required");
+      return;
+    }
+    setLoading(true);
+    try {
+      await apiService.auth.login(email.trim(), password);
+      showToast("success", "Welcome back, Admin!");
+      onLogin();
+    } catch (err: any) {
+      showToast("error", err.message || "Invalid credentials");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -670,11 +931,12 @@ const LoginPage = ({ onLogin }: { onLogin: () => void }) => {
             </div>
 
             <button
-              onClick={onLogin}
-              className="w-full py-3.5 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg active:scale-[0.98] text-sm"
+              onClick={handleLoginSubmit}
+              disabled={loading}
+              className="w-full py-3.5 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg active:scale-[0.98] text-sm disabled:opacity-60"
               style={{ background: "linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)", boxShadow: "0 8px 24px rgba(37,99,235,0.3)" }}
             >
-              Sign In to Dashboard
+              {loading ? "Signing In..." : "Sign In to Dashboard"}
             </button>
           </div>
 
@@ -831,6 +1093,28 @@ const pageTitle: Record<Page, string> = {
 const TopNav = ({ page, onNavigate, onRefresh }: { page: Page; onNavigate: (p: Page) => void; onRefresh: () => void }) => {
   const [showNotifs, setShowNotifs] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [timeStr, setTimeStr] = useState("");
+
+  useEffect(() => {
+    const updateClock = () => {
+      const now = new Date();
+      const weekday = now.toLocaleDateString("en-US", { weekday: "long" });
+      const day = now.getDate();
+      const month = now.toLocaleDateString("en-US", { month: "long" });
+      const year = now.getFullYear();
+      const timePart = now.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true
+      });
+      const tzPart = now.toLocaleDateString("en-US", { day: "numeric", timeZoneName: "short" }).split(" ").pop();
+      setTimeStr(`${weekday}, ${day} ${month} ${year} · ${timePart} (${tzPart})`);
+    };
+    updateClock();
+    const timer = setInterval(updateClock, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -847,7 +1131,7 @@ const TopNav = ({ page, onNavigate, onRefresh }: { page: Page; onNavigate: (p: P
           <h1 className="text-base font-semibold text-slate-800" style={{ fontFamily: "'Poppins', sans-serif" }}>
             {pageTitle[page]}
           </h1>
-          <p className="text-[11px] text-slate-400 mt-0.5">June 21, 2024 · 10:42 AM</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">{timeStr}</p>
         </div>
         <div className="flex items-center gap-2.5">
           <div className="relative hidden md:block">
@@ -904,92 +1188,140 @@ const activityMeta = {
 
 const DashboardPage = ({ onNavigate }: { onNavigate: (p: Page) => void }) => {
   const [showAlerts, setShowAlerts] = useState(false);
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const loadStats = useCallback(async () => {
+    try {
+      const data = await apiService.dashboard.getStats();
+      setStats(data);
+    } catch (err: any) {
+      showToast("error", "Failed to load dashboard statistics");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
 
   // ── Dynamic KPI Calculations ──────────────────────────────────────────────
   const dynamicKPIs = useMemo(() => {
-    const totalOrdersVal = (2847 + Math.max(0, orders.length - 6)).toLocaleString();
-    const totalSuppliersVal = (156 + Math.max(0, suppliers.length - 7)).toString();
-    const delayedCount = 43 + Math.max(0, orders.filter(o => o.status === "Delayed").length - 2);
+    if (!stats || !stats.kpis) {
+      return [
+        { title: "Total Orders", value: "—", change: "...", Icon: ShoppingCart, iconBg: "bg-blue-600", trend: "up" as const },
+        { title: "Total Suppliers", value: "—", change: "...", Icon: Building2, iconBg: "bg-indigo-600", trend: "up" as const },
+        { title: "Delayed Deliveries", value: "—", change: "...", Icon: Clock, iconBg: "bg-amber-500", trend: "down" as const },
+        { title: "Inventory Level", value: "—", change: "...", Icon: Package, iconBg: "bg-teal-600", trend: "down" as const },
+        { title: "Revenue", value: "—", change: "...", Icon: DollarSign, iconBg: "bg-emerald-600", trend: "up" as const },
+        { title: "Risk Score", value: "—", change: "...", Icon: AlertTriangle, iconBg: "bg-red-500", trend: "up" as const },
+      ];
+    }
+
+    const { kpis, inventory_status } = stats;
+
+    const totalOrdersVal = Number(kpis.total_orders || 0).toLocaleString();
+    const totalSuppliersVal = Number(kpis.total_suppliers || 0).toString();
+    const delayedCount = Number(kpis.delayed_deliveries || 0).toLocaleString();
     
-    const inStock = products.filter(p => p.status === "In Stock").length;
-    const lowStock = products.filter(p => p.status === "Low Stock").length;
-    const totalP = products.length || 1;
-    const inventoryVal = Math.round(((inStock + 0.5 * lowStock) / totalP) * 100) + "%";
+    const critical = Number(inventory_status?.critical || 0);
+    const warning = Number(inventory_status?.warning || 0);
+    const ok = Number(inventory_status?.ok || 0);
+    const totalInv = critical + warning + ok || 1;
+    const inventoryVal = Math.round((ok / totalInv) * 100) + "%";
     
-    const initialOrdersVal = 83824.2;
-    const currentOrdersVal = orders.reduce((sum, o) => sum + o.value, 0);
-    const addedRevenue = (currentOrdersVal - initialOrdersVal) / 1000000;
-    const revenueVal = "$" + (4.2 + Math.max(0, addedRevenue)).toFixed(2) + "M";
+    const rev = Number(kpis.total_revenue || 0);
+    const revenueVal = rev >= 1000000 
+      ? "$" + (rev / 1000000).toFixed(1) + "M" 
+      : "$" + rev.toLocaleString();
     
-    const highRiskSuppliers = suppliers.filter(s => s.risk === "High").length;
-    const riskScoreVal = (5.5 + (highRiskSuppliers * 0.65)).toFixed(1) + "/10";
+    const high = Number(kpis.high_risk_orders || 0);
+    const med = Number(kpis.medium_risk_orders || 0);
+    const tot = Number(kpis.total_orders || 1);
+    const riskScoreVal = (((high + med * 0.5) / tot) * 10).toFixed(1) + "/10";
 
     return [
       { title: "Total Orders", value: totalOrdersVal, change: "+12.5%", Icon: ShoppingCart, iconBg: "bg-blue-600", trend: "up" as const },
       { title: "Total Suppliers", value: totalSuppliersVal, change: "+3 new", Icon: Building2, iconBg: "bg-indigo-600", trend: "up" as const },
-      { title: "Delayed Deliveries", value: delayedCount.toString(), change: "+8.2%", Icon: Clock, iconBg: "bg-amber-500", trend: "down" as const },
+      { title: "Delayed Deliveries", value: delayedCount, change: "+8.2%", Icon: Clock, iconBg: "bg-amber-500", trend: "down" as const },
       { title: "Inventory Level", value: inventoryVal, change: "-2.1%", Icon: Package, iconBg: "bg-teal-600", trend: "down" as const },
       { title: "Revenue", value: revenueVal, change: "+18.3%", Icon: DollarSign, iconBg: "bg-emerald-600", trend: "up" as const },
       { title: "Risk Score", value: riskScoreVal, change: "-0.5 pts", Icon: AlertTriangle, iconBg: "bg-red-500", trend: "up" as const },
     ];
-  }, [orders.length, suppliers.length, products.length]);
+  }, [stats]);
 
   // ── Dynamic Order Trend Chart Data ────────────────────────────────────────
   const dynamicOrderTrend = useMemo(() => {
-    const baseTrend = [
-      { month: "Jan", orders: 420, delivered: 380, delayed: 40 },
-      { month: "Feb", orders: 380, delivered: 350, delayed: 30 },
-      { month: "Mar", orders: 510, delivered: 475, delayed: 35 },
-      { month: "Apr", orders: 490, delivered: 450, delayed: 40 },
-      { month: "May", orders: 560, delivered: 510, delayed: 50 },
-      { month: "Jun", orders: 487, delivered: 443, delayed: 44 },
-    ];
-    const extraOrders = orders.length - 6;
-    if (extraOrders > 0) {
-      const extraDelivered = orders.filter((o, i) => i >= 6 && o.status === "Delivered").length;
-      const extraDelayed = orders.filter((o, i) => i >= 6 && o.status === "Delayed").length;
-      baseTrend[5].orders += extraOrders;
-      baseTrend[5].delivered += extraDelivered;
-      baseTrend[5].delayed += extraDelayed;
+    if (!stats || !stats.monthly_sales_trend || stats.monthly_sales_trend.length === 0) {
+      return [
+        { month: "Jan", orders: 0, delivered: 0, delayed: 0 },
+      ];
     }
-    return baseTrend;
-  }, [orders.length]);
+    return stats.monthly_sales_trend.map((m: any) => ({
+      month: m.month_name.slice(0, 3),
+      orders: Number(m.total_orders || 0),
+      delivered: Number(m.delivered || 0),
+      delayed: Number(m.delayed || 0),
+    }));
+  }, [stats]);
 
   // ── Dynamic Risk Distribution Pie Chart ────────────────────────────────────
   const dynamicRiskDist = useMemo(() => {
-    const lowCount = suppliers.filter(s => s.risk === "Low").length;
-    const medCount = suppliers.filter(s => s.risk === "Medium").length;
-    const highCount = suppliers.filter(s => s.risk === "High").length;
-    return [
-      { name: "Low Risk", value: 159 + lowCount, color: "#10b981" },
-      { name: "Medium Risk", value: 27 + medCount, color: "#f59e0b" },
-      { name: "High Risk", value: 10 + highCount, color: "#ef4444" },
-    ];
-  }, [suppliers.length]);
+    if (!stats || !stats.risk_distribution) {
+      return [
+        { name: "Low Risk", value: 0, color: "#10b981" },
+        { name: "Medium Risk", value: 0, color: "#f59e0b" },
+        { name: "High Risk", value: 0, color: "#ef4444" },
+      ];
+    }
+    const colorMap: Record<string, string> = {
+      Low: "#10b981",
+      Medium: "#f59e0b",
+      High: "#ef4444"
+    };
+    return stats.risk_distribution.map((r: any) => ({
+      name: r.risk_level + " Risk",
+      value: Number(r.count || 0),
+      color: colorMap[r.risk_level] || "#cbd5e1"
+    }));
+  }, [stats]);
 
   // ── Dynamic Supplier Performance Bar Chart ────────────────────────────────
   const dynamicSupplierPerf = useMemo(() => {
-    return suppliers.slice(0, 6).map((s) => ({
+    if (!stats || !stats.supplier_ranking) {
+      return [];
+    }
+    return stats.supplier_ranking.map((s: any) => ({
       name: s.name.split(" ")[0],
-      onTime: s.onTime,
-      quality: s.quality,
-      cost: s.risk === "High" ? 65 : s.risk === "Medium" ? 78 : 92,
+      onTime: s.total_orders > 0 ? Math.round(((s.total_orders - s.high_risk_orders) / s.total_orders) * 100) : 100,
+      quality: Math.round(Number(s.rating) * 20),
+      cost: s.status === "Active" ? 90 : 60,
     }));
-  }, [suppliers.length]);
+  }, [stats]);
 
   // ── Dynamic Recent Activities ──────────────────────────────────────────────
   const dynamicActivities = useMemo(() => {
-    const list = [...recentActivities];
-    const importLog = localStorage.getItem("last_import_log");
-    if (importLog) {
-      list.unshift({
-        time: "Just now",
-        text: importLog,
-        type: "success" as const,
-      });
+    if (!stats || !stats.recent_activities) {
+      return [
+        { time: "Just now", text: "Dashboard loading...", type: "info" as const }
+      ];
     }
-    return list.slice(0, 5);
-  }, []);
+    return stats.recent_activities.map((a: any) => ({
+      time: a.time,
+      text: a.text,
+      type: a.type as "success" | "error" | "warning" | "info"
+    }));
+  }, [stats]);
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center bg-[#f8faff]/50">
+        <RefreshCw size={32} className="text-blue-900 animate-spin mb-4" />
+        <p className="text-sm font-semibold text-slate-600">Loading Dashboard Metrics...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-5">
@@ -1002,11 +1334,7 @@ const DashboardPage = ({ onNavigate }: { onNavigate: (p: Page) => void }) => {
         <div>
           <h2 className="text-xl font-bold mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Good morning, Alex!</h2>
           <p className="text-blue-200 text-sm">
-            You have{" "}
-            <span className="text-white font-semibold bg-white/15 px-1.5 py-0.5 rounded-md">3 high-risk orders</span>{" "}
-            and{" "}
-            <span className="text-white font-semibold bg-white/15 px-1.5 py-0.5 rounded-md">2 inventory alerts</span>{" "}
-            to review today.
+            Real-time analytics and optimizations are loaded and active. Review key supply chain metrics below.
           </p>
         </div>
         <div className="hidden md:flex items-center gap-2">
@@ -1101,7 +1429,7 @@ const DashboardPage = ({ onNavigate }: { onNavigate: (p: Page) => void }) => {
           <SectionHeader title="Recent Activity" />
           <div className="space-y-3.5">
             {dynamicActivities.map((a, i) => {
-              const meta = activityMeta[a.type];
+              const meta = activityMeta[a.type] || activityMeta.info;
               return (
                 <div key={i} className="flex items-start gap-3">
                   <div className={`p-1.5 rounded-lg flex-shrink-0 mt-0.5 ${meta.bg}`}>
@@ -1123,22 +1451,49 @@ const DashboardPage = ({ onNavigate }: { onNavigate: (p: Page) => void }) => {
 
 // ─── Suppliers Page ───────────────────────────────────────────────────────────
 
-const SuppliersPage = () => {
-  const [search, setSearch] = useState("");
-  const [filterRisk, setFilterRisk] = useState("All");
-  const [showAdd, setShowAdd] = useState(false);
-  const [viewSupplier, setViewSupplier] = useState<typeof suppliers[0] | null>(null);
-  const [editSupplier, setEditSupplier] = useState<typeof suppliers[0] | null>(null);
-  const [deleteSupplier, setDeleteSupplier] = useState<typeof suppliers[0] | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 5;
+type DbSupplier = { supplier_id: number; name: string; email: string; phone: string; rating: number; status: string; };
 
-  const filtered = suppliers.filter(
+const SuppliersPage = () => {
+  const [dbSuppliers, setDbSuppliers] = useState<DbSupplier[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("All");
+  const [showAdd, setShowAdd] = useState(false);
+  const [deleteSupplier, setDeleteSupplier] = useState<DbSupplier | null>(null);
+  const [editSupplier, setEditSupplier] = useState<DbSupplier | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 8;
+
+  const loadSuppliers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await apiService.suppliers.list();
+      setDbSuppliers(data);
+    } catch (err: any) {
+      showToast("error", "Failed to load suppliers from database");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadSuppliers(); }, [loadSuppliers]);
+
+  const handleDelete = async (s: DbSupplier) => {
+    try {
+      await apiService.suppliers.delete(s.supplier_id);
+      showToast("success", `${s.name} removed from database`);
+      setDeleteSupplier(null);
+      loadSuppliers();
+    } catch (err: any) {
+      showToast("error", err.message || "Failed to delete supplier");
+    }
+  };
+
+  const filtered = dbSuppliers.filter(
     (s) =>
       (s.name.toLowerCase().includes(search.toLowerCase()) ||
-       s.country.toLowerCase().includes(search.toLowerCase()) ||
-       s.category.toLowerCase().includes(search.toLowerCase())) &&
-      (filterRisk === "All" || s.risk === filterRisk)
+       (s.email || "").toLowerCase().includes(search.toLowerCase())) &&
+      (filterStatus === "All" || s.status === filterStatus)
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -1146,13 +1501,12 @@ const SuppliersPage = () => {
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-5">
-      {showAdd && <AddSupplierModal onClose={() => setShowAdd(false)} />}
-      {viewSupplier && <ViewSupplierModal supplier={viewSupplier} onClose={() => setViewSupplier(null)} />}
-      {editSupplier && <EditSupplierModal supplier={editSupplier} onClose={() => setEditSupplier(null)} />}
+      {showAdd && <AddSupplierModal onClose={() => setShowAdd(false)} onSuccess={loadSuppliers} />}
+      {editSupplier && <EditSupplierModal supplier={editSupplier} onClose={() => setEditSupplier(null)} onSuccess={loadSuppliers} />}
       {deleteSupplier && (
         <ConfirmDialog
-          message={`Are you sure you want to remove "${deleteSupplier.name}" from your supplier list? This action cannot be undone.`}
-          onConfirm={() => { showToast("success", `${deleteSupplier.name} removed`); setDeleteSupplier(null); }}
+          message={`Are you sure you want to remove "${deleteSupplier.name}" from the database? This action cannot be undone.`}
+          onConfirm={() => handleDelete(deleteSupplier)}
           onCancel={() => setDeleteSupplier(null)}
         />
       )}
@@ -1160,10 +1514,10 @@ const SuppliersPage = () => {
       {/* Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Total Suppliers", value: "156", Icon: Building2, bg: "bg-blue-600" },
-          { label: "Active", value: "138", Icon: CheckCircle, bg: "bg-emerald-600" },
-          { label: "Under Review", value: "12", Icon: AlertTriangle, bg: "bg-amber-500" },
-          { label: "Avg On-Time", value: "84%", Icon: Clock, bg: "bg-indigo-600" },
+          { label: "Total Suppliers", value: dbSuppliers.length.toString(), Icon: Building2, bg: "bg-blue-600" },
+          { label: "Active", value: dbSuppliers.filter(s => s.status === "Active").length.toString(), Icon: CheckCircle, bg: "bg-emerald-600" },
+          { label: "Under Review", value: dbSuppliers.filter(s => s.status === "Review").length.toString(), Icon: AlertTriangle, bg: "bg-amber-500" },
+          { label: "Avg Rating", value: dbSuppliers.length ? (dbSuppliers.reduce((a,s)=>a+Number(s.rating),0)/dbSuppliers.length).toFixed(1)+"/5" : "—", Icon: Star, bg: "bg-indigo-600" },
         ].map((m) => (
           <Card key={m.label} className="p-4 flex items-center gap-4">
             <div className={`p-2.5 rounded-xl ${m.bg} flex-shrink-0`}>
@@ -1183,25 +1537,21 @@ const SuppliersPage = () => {
           <div className="relative flex-1">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
-              placeholder="Search suppliers by name, country or category..."
+              placeholder="Search suppliers by name or email..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
               className="w-full pl-9 pr-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25 transition-all"
             />
           </div>
           <div className="flex gap-1.5 flex-wrap">
-            {["All", "Low", "Medium", "High"].map((r) => (
+            {["All", "Active", "Review", "Inactive"].map((r) => (
               <button
                 key={r}
-                onClick={() => { setFilterRisk(r); setCurrentPage(1); }}
+                onClick={() => { setFilterStatus(r); setCurrentPage(1); }}
                 className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                  filterRisk === r
-                    ? "bg-blue-900 text-white shadow-sm"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  filterStatus === r ? "bg-blue-900 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
-              >
-                {r}
-              </button>
+              >{r}</button>
             ))}
             <button onClick={() => setShowAdd(true)} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-colors">
               <Plus size={13} /> Add Supplier
@@ -1210,48 +1560,34 @@ const SuppliersPage = () => {
         </div>
 
         <div className="overflow-x-auto">
+          {loading ? (
+            <div className="text-center py-12 text-slate-400"><RefreshCw size={24} className="mx-auto mb-2 animate-spin opacity-40" /><p className="text-sm">Loading suppliers...</p></div>
+          ) : (
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100">
-                {["ID", "Supplier Name", "Country", "Category", "On-Time %", "Quality %", "Risk", "Status", "Actions"].map((h) => (
-                  <th key={h} className="text-left py-3 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
-                    {h}
-                  </th>
+                {["ID", "Supplier Name", "Email", "Phone", "Rating", "Status", "Actions"].map((h) => (
+                  <th key={h} className="text-left py-3 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {paginated.map((s, i) => (
-                <tr
-                  key={s.id}
-                  className={`border-b border-slate-50 hover:bg-blue-50/50 transition-colors ${i % 2 !== 0 ? "bg-slate-50/40" : ""}`}
-                >
-                  <td className="py-3.5 px-3 text-[10px] text-slate-400 font-mono">{s.id}</td>
+                <tr key={s.supplier_id} className={`border-b border-slate-50 hover:bg-blue-50/50 transition-colors ${i % 2 !== 0 ? "bg-slate-50/40" : ""}` }>
+                  <td className="py-3.5 px-3 text-[10px] text-slate-400 font-mono">{s.supplier_id}</td>
                   <td className="py-3.5 px-3 text-sm font-semibold text-slate-800 whitespace-nowrap">{s.name}</td>
-                  <td className="py-3.5 px-3 text-xs text-slate-600">{s.country}</td>
-                  <td className="py-3.5 px-3 text-xs text-slate-600">{s.category}</td>
+                  <td className="py-3.5 px-3 text-xs text-slate-600">{s.email || "—"}</td>
+                  <td className="py-3.5 px-3 text-xs text-slate-600">{s.phone || "—"}</td>
                   <td className="py-3.5 px-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-700 w-7">{s.onTime}%</span>
-                      <ProgressBar value={s.onTime} color={s.onTime >= 85 ? "bg-emerald-500" : s.onTime >= 75 ? "bg-amber-500" : "bg-red-500"} />
+                    <div className="flex items-center gap-1">
+                      <Star size={11} className="text-amber-400" />
+                      <span className="text-xs font-bold text-slate-700">{Number(s.rating).toFixed(1)}</span>
                     </div>
                   </td>
-                  <td className="py-3.5 px-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-700 w-7">{s.quality}%</span>
-                      <ProgressBar value={s.quality} color="bg-blue-500" />
-                    </div>
-                  </td>
-                  <td className="py-3.5 px-3">
-                    <Badge label={s.risk} colorClass={riskColor[s.risk]} />
-                  </td>
-                  <td className="py-3.5 px-3">
-                    <Badge label={s.status} colorClass={statusColor[s.status]} />
-                  </td>
+                  <td className="py-3.5 px-3"><Badge label={s.status} colorClass={statusColor[s.status] ?? "bg-slate-100 text-slate-600"} /></td>
                   <td className="py-3.5 px-3">
                     <div className="flex items-center gap-0.5">
-                      <button onClick={() => setViewSupplier(s)} className="p-1.5 hover:bg-blue-100 rounded-lg text-blue-600 transition-colors" title="View"><Eye size={13} /></button>
-                      <button onClick={() => setEditSupplier(s)} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors" title="Edit"><Edit2 size={13} /></button>
+                      <button onClick={() => setEditSupplier(s)} className="p-1.5 hover:bg-blue-100 rounded-lg text-blue-900 transition-colors" title="Edit"><Edit2 size={13} /></button>
                       <button onClick={() => setDeleteSupplier(s)} className="p-1.5 hover:bg-red-100 rounded-lg text-red-500 transition-colors" title="Delete"><Trash2 size={13} /></button>
                     </div>
                   </td>
@@ -1259,10 +1595,11 @@ const SuppliersPage = () => {
               ))}
             </tbody>
           </table>
-          {filtered.length === 0 && (
+          )}
+          {!loading && filtered.length === 0 && (
             <div className="text-center py-12 text-slate-400">
               <Building2 size={32} className="mx-auto mb-2 opacity-30" />
-              <p className="text-sm">No suppliers match your search</p>
+              <p className="text-sm">No suppliers found in database</p>
             </div>
           )}
         </div>
@@ -1283,100 +1620,89 @@ const SuppliersPage = () => {
 
 // ─── Inventory Page ───────────────────────────────────────────────────────────
 
+type DbProduct = { product_id: number; category_id: number; category_name: string; product_name: string; product_price: number; product_status: string; description: string; };
+type DbInventory = { inventory_id: number; product_id: number; product_name: string; product_price: number; warehouse_name: string; stock_level: number; reorder_point: number; safety_stock: number; lead_time_days: number; };
+
 const InventoryPage = () => {
+  const [dbProducts, setDbProducts] = useState<DbProduct[]>([]);
+  const [dbInventory, setDbInventory] = useState<DbInventory[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("All");
-  const categories = ["All", "Electronics", "Machinery", "Raw Materials", "Components"];
-  const filtered = products.filter((p) => activeCategory === "All" || p.category === activeCategory);
   const [showAdd, setShowAdd] = useState(false);
-  const [deleteProduct, setDeleteProduct] = useState<typeof products[0] | null>(null);
-  const [editProduct, setEditProduct] = useState<typeof products[0] | null>(null);
-  const [viewProduct, setViewProduct] = useState<typeof products[0] | null>(null);
+  const [deleteProduct, setDeleteProduct] = useState<DbProduct | null>(null);
+  const [editItem, setEditItem] = useState<{ item: DbInventory; product: DbProduct } | null>(null);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [prods, inv] = await Promise.all([apiService.products.list(), apiService.inventory.list()]);
+      setDbProducts(prods);
+      setDbInventory(inv);
+    } catch (err: any) {
+      showToast("error", "Failed to load inventory data");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const handleDelete = async (p: DbProduct) => {
+    try {
+      await apiService.products.delete(p.product_id);
+      showToast("success", `${p.product_name} removed from database`);
+      setDeleteProduct(null);
+      loadData();
+    } catch (err: any) {
+      showToast("error", err.message || "Failed to delete product");
+    }
+  };
+
+  const categories = ["All", ...Array.from(new Set(dbProducts.map(p => p.category_name).filter(Boolean)))];
+  const filteredInv = dbInventory.filter((i) => activeCategory === "All" || i.product_name?.toLowerCase().includes(activeCategory.toLowerCase()));
+
+  const outOfStock = dbInventory.filter(i => i.stock_level === 0).length;
+  const lowStock = dbInventory.filter(i => i.stock_level > 0 && i.stock_level < i.reorder_point).length;
+  const healthy = dbInventory.filter(i => i.stock_level >= i.reorder_point).length;
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-5">
-      {showAdd && <AddProductModal onClose={() => setShowAdd(false)} />}
-      {deleteProduct && (
-        <ConfirmDialog
-          message={`Remove "${deleteProduct.name}" from inventory? This action cannot be undone.`}
-          onConfirm={() => { showToast("success", `${deleteProduct.name} removed from inventory`); setDeleteProduct(null); }}
-          onCancel={() => setDeleteProduct(null)}
+      {showAdd && <AddProductModal onClose={() => setShowAdd(false)} onSuccess={loadData} />}
+      {editItem && (
+        <EditInventoryModal
+          item={editItem.item}
+          product={editItem.product}
+          onClose={() => setEditItem(null)}
+          onSuccess={loadData}
         />
       )}
-      {editProduct && (
-        <Modal title="Edit Product" onClose={() => setEditProduct(null)}>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Product Name</label>
-              <input defaultValue={editProduct.name} className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25" />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Stock Quantity</label>
-              <input type="number" defaultValue={editProduct.stock} className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25" />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Unit Price ($)</label>
-              <input type="number" step="0.01" defaultValue={editProduct.price} className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25" />
-            </div>
-            <div className="flex gap-2 pt-2">
-              <button onClick={() => { showToast("success", `${editProduct.name} updated`); setEditProduct(null); }}
-                className="flex-1 py-2.5 bg-blue-900 text-white rounded-xl text-sm font-semibold hover:bg-blue-800 transition-colors">Save Changes</button>
-              <button onClick={() => setEditProduct(null)} className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-200 transition-colors">Cancel</button>
-            </div>
-          </div>
-        </Modal>
-      )}
-      {viewProduct && (
-        <Modal title="Product Details" onClose={() => setViewProduct(null)}>
-          <div className="space-y-4">
-            <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl">
-              <div className="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center">
-                <Package size={24} className="text-white" />
-              </div>
-              <div>
-                <div className="text-lg font-bold text-slate-800">{viewProduct.name}</div>
-                <div className="text-sm text-slate-500">{viewProduct.category}</div>
-                <Badge label={viewProduct.status} colorClass={statusColor[viewProduct.status]} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: "Product ID", value: viewProduct.id },
-                { label: "Category", value: viewProduct.category },
-                { label: "Stock Qty", value: viewProduct.stock.toLocaleString() },
-                { label: "Reorder Point", value: viewProduct.reorder.toLocaleString() },
-                { label: "Unit Price", value: `$${viewProduct.price.toFixed(2)}` },
-                { label: "Status", value: viewProduct.status },
-              ].map((f) => (
-                <div key={f.label} className="p-3 bg-slate-50 rounded-xl">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{f.label}</div>
-                  <div className="text-sm font-semibold text-slate-800 mt-1">{f.value}</div>
-                </div>
-              ))}
-            </div>
-            <button onClick={() => setViewProduct(null)} className="w-full py-2.5 bg-blue-900 text-white rounded-xl text-sm font-semibold hover:bg-blue-800 transition-colors">Close</button>
-          </div>
-        </Modal>
+      {deleteProduct && (
+        <ConfirmDialog
+          message={`Remove "${deleteProduct.product_name}" from database? This action cannot be undone.`}
+          onConfirm={() => handleDelete(deleteProduct)}
+          onCancel={() => setDeleteProduct(null)}
+        />
       )}
       {/* Alert banners */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center gap-3">
           <div className="p-2 bg-red-100 rounded-xl flex-shrink-0"><XCircle size={17} className="text-red-600" /></div>
           <div>
-            <div className="font-bold text-red-700 text-sm">2 Out of Stock</div>
+            <div className="font-bold text-red-700 text-sm">{outOfStock} Out of Stock</div>
             <div className="text-xs text-red-500 mt-0.5">Immediate reorder required</div>
           </div>
         </div>
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
           <div className="p-2 bg-amber-100 rounded-xl flex-shrink-0"><AlertTriangle size={17} className="text-amber-600" /></div>
           <div>
-            <div className="font-bold text-amber-700 text-sm">3 Low Stock Items</div>
+            <div className="font-bold text-amber-700 text-sm">{lowStock} Low Stock Items</div>
             <div className="text-xs text-amber-500 mt-0.5">Below reorder threshold</div>
           </div>
         </div>
         <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3">
           <div className="p-2 bg-emerald-100 rounded-xl flex-shrink-0"><CheckCircle size={17} className="text-emerald-600" /></div>
           <div>
-            <div className="font-bold text-emerald-700 text-sm">18 Items Healthy</div>
+            <div className="font-bold text-emerald-700 text-sm">{healthy} Items Healthy</div>
             <div className="text-xs text-emerald-500 mt-0.5">Stock levels are optimal</div>
           </div>
         </div>
@@ -1386,13 +1712,8 @@ const InventoryPage = () => {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
           <div className="flex gap-1.5 flex-wrap">
             {categories.map((c) => (
-              <button
-                key={c}
-                onClick={() => setActiveCategory(c)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${activeCategory === c ? "bg-blue-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
-              >
-                {c}
-              </button>
+              <button key={c} onClick={() => setActiveCategory(c)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${activeCategory === c ? "bg-blue-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{c}</button>
             ))}
           </div>
           <button onClick={() => setShowAdd(true)} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-colors flex-shrink-0">
@@ -1401,46 +1722,44 @@ const InventoryPage = () => {
         </div>
 
         <div className="overflow-x-auto">
+          {loading ? (
+            <div className="text-center py-12 text-slate-400"><RefreshCw size={24} className="mx-auto mb-2 animate-spin opacity-40" /><p className="text-sm">Loading inventory...</p></div>
+          ) : (
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100">
-                {["Product ID", "Product Name", "Category", "Stock Qty", "Reorder Point", "Fill Rate", "Unit Price", "Status", "Actions"].map((h) => (
-                  <th key={h} className="text-left py-3 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
-                    {h}
-                  </th>
+                {["Product ID", "Product Name", "Warehouse", "Stock Qty", "Reorder Point", "Safety Stock", "Lead Time", "Status", "Actions"].map((h) => (
+                  <th key={h} className="text-left py-3 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((p, i) => {
-                const fillPct = p.reorder > 0 ? Math.min(100, (p.stock / (p.reorder * 3)) * 100) : 0;
+              {filteredInv.map((item, i) => {
+                const stockStatus = item.stock_level === 0 ? "Out of Stock" : item.stock_level < item.reorder_point ? "Low Stock" : "In Stock";
+                const fillPct = item.reorder_point > 0 ? Math.min(100, (item.stock_level / (item.reorder_point * 3)) * 100) : 100;
+                const prod = dbProducts.find(p => p.product_id === item.product_id);
                 return (
-                  <tr key={p.id} className={`border-b border-slate-50 hover:bg-blue-50/50 transition-colors ${i % 2 !== 0 ? "bg-slate-50/40" : ""}`}>
-                    <td className="py-3.5 px-3 text-[10px] text-slate-400 font-mono">{p.id}</td>
-                    <td className="py-3.5 px-3 text-sm font-semibold text-slate-800 whitespace-nowrap">{p.name}</td>
-                    <td className="py-3.5 px-3 text-xs text-slate-600">{p.category}</td>
+                  <tr key={item.inventory_id} className={`border-b border-slate-50 hover:bg-blue-50/50 transition-colors ${i % 2 !== 0 ? "bg-slate-50/40" : ""}`}>
+                    <td className="py-3.5 px-3 text-[10px] text-slate-400 font-mono">{item.product_id}</td>
+                    <td className="py-3.5 px-3 text-sm font-semibold text-slate-800 whitespace-nowrap">{item.product_name}</td>
+                    <td className="py-3.5 px-3 text-xs text-slate-600">{item.warehouse_name}</td>
                     <td className="py-3.5 px-3">
-                      <span className={`text-sm font-bold ${p.stock === 0 ? "text-red-600" : p.stock < p.reorder ? "text-amber-600" : "text-slate-800"}`}>
-                        {p.stock.toLocaleString()}
+                      <span className={`text-sm font-bold ${item.stock_level === 0 ? "text-red-600" : item.stock_level < item.reorder_point ? "text-amber-600" : "text-slate-800"}`}>
+                        {item.stock_level.toLocaleString()}
                       </span>
                     </td>
-                    <td className="py-3.5 px-3 text-xs text-slate-600">{p.reorder.toLocaleString()}</td>
-                    <td className="py-3.5 px-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 bg-slate-200 rounded-full h-1.5">
-                          <div className={`h-1.5 rounded-full ${fillPct > 50 ? "bg-emerald-500" : fillPct > 20 ? "bg-amber-500" : "bg-red-500"}`}
-                            style={{ width: `${fillPct}%` }} />
-                        </div>
-                        <span className="text-[10px] text-slate-400">{fillPct.toFixed(0)}%</span>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-3 text-sm font-semibold text-slate-800">${p.price.toFixed(2)}</td>
-                    <td className="py-3.5 px-3"><Badge label={p.status} colorClass={statusColor[p.status]} /></td>
+                    <td className="py-3.5 px-3 text-xs text-slate-600">{item.reorder_point.toLocaleString()}</td>
+                    <td className="py-3.5 px-3 text-xs text-slate-600">{item.safety_stock.toLocaleString()}</td>
+                    <td className="py-3.5 px-3 text-xs text-slate-600">{item.lead_time_days}d</td>
+                    <td className="py-3.5 px-3"><Badge label={stockStatus} colorClass={statusColor[stockStatus] ?? "bg-slate-100 text-slate-600"} /></td>
                     <td className="py-3.5 px-3">
                       <div className="flex items-center gap-0.5">
-                        <button onClick={() => setViewProduct(p)} className="p-1.5 hover:bg-blue-100 rounded-lg text-blue-600 transition-colors" title="View"><Eye size={13} /></button>
-                        <button onClick={() => setEditProduct(p)} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors" title="Edit"><Edit2 size={13} /></button>
-                        <button onClick={() => setDeleteProduct(p)} className="p-1.5 hover:bg-red-100 rounded-lg text-red-500 transition-colors" title="Delete"><Trash2 size={13} /></button>
+                        {prod && (
+                          <>
+                            <button onClick={() => setEditItem({ item, product: prod })} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors" title="Edit Product"><Edit2 size={13} /></button>
+                            <button onClick={() => setDeleteProduct(prod)} className="p-1.5 hover:bg-red-100 rounded-lg text-red-500 transition-colors" title="Delete Product"><Trash2 size={13} /></button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1448,6 +1767,10 @@ const InventoryPage = () => {
               })}
             </tbody>
           </table>
+          )}
+          {!loading && filteredInv.length === 0 && (
+            <div className="text-center py-12 text-slate-400"><Package size={32} className="mx-auto mb-2 opacity-30" /><p className="text-sm">No inventory records found</p></div>
+          )}
         </div>
       </Card>
     </div>
@@ -1502,31 +1825,72 @@ function getTimeline(order: typeof orders[0]) {
   });
 }
 
+type DbOrder = { order_id: number; customer_id: number; customer_fname: string; customer_lname: string; product_id: number; product_name: string; quantity: number; sales: number; profit: number; order_date: string; order_status: string; payment_type: string; };
+
 const OrdersPage = () => {
-  const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
+  const [dbOrders, setDbOrders] = useState<DbOrder[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [showNewOrder, setShowNewOrder] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
-  const selected = orders.find((o) => o.id === selectedOrder) ?? null;
-  const timeline = selected ? getTimeline(selected) : [];
+  const loadOrders = useCallback(async () => {
+    setLoadingOrders(true);
+    try {
+      const data = await apiService.orders.list();
+      setDbOrders(data);
+    } catch (err: any) {
+      showToast("error", "Failed to load orders from database");
+    } finally {
+      setLoadingOrders(false);
+    }
+  }, []);
 
-  // Status-specific footer messages
-  const statusNote: Record<OrderStatus, { text: string; bg: string; icon: React.ReactNode }> = {
-    Processing: { text: "Order is being processed by the supplier.", bg: "bg-blue-50", icon: <Clock size={12} className="text-blue-500" /> },
-    Delayed: { text: `Shipment delayed — expected by ${selected?.eta ?? "—"}.`, bg: "bg-amber-50", icon: <AlertTriangle size={12} className="text-amber-500" /> },
-    "In Transit": { text: `In transit — estimated delivery ${selected?.eta ?? "—"}.`, bg: "bg-indigo-50", icon: <Truck size={12} className="text-indigo-500" /> },
-    Delivered: { text: "Order delivered successfully. All steps complete.", bg: "bg-emerald-50", icon: <CheckCircle size={12} className="text-emerald-600" /> },
+  useEffect(() => { loadOrders(); }, [loadOrders]);
+
+  const handleUpdateStatus = async (orderId: number, newStatus: string) => {
+    try {
+      await apiService.orders.update(orderId, { order_status: newStatus });
+      showToast("success", `Order #${orderId} status updated to ${newStatus}`);
+      loadOrders();
+    } catch (err: any) {
+      showToast("error", err.message || "Failed to update status");
+    }
   };
-  const note = selected ? statusNote[selected.status as OrderStatus] : null;
+
+  const handleDeleteOrder = async (orderId: number) => {
+    try {
+      await apiService.orders.delete(orderId);
+      showToast("success", `Order #${orderId} deleted successfully`);
+      setSelectedOrderId(null);
+      setConfirmDeleteId(null);
+      loadOrders();
+    } catch (err: any) {
+      showToast("error", err.message || "Failed to delete order");
+    }
+  };
+
+  const selectedOrder = dbOrders.find(o => o.order_id === selectedOrderId) ?? null;
+
+  const delivered = dbOrders.filter(o => o.order_status === "COMPLETE").length;
+  const delayed = dbOrders.filter(o => o.order_status === "PENDING").length;
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-5">
-      {showNewOrder && <NewOrderModal onClose={() => setShowNewOrder(false)} />}
+      {showNewOrder && <NewOrderModal onClose={() => setShowNewOrder(false)} onSuccess={loadOrders} />}
+      {confirmDeleteId !== null && (
+        <ConfirmDialog
+          message={`Remove Order #${confirmDeleteId} from database? This action cannot be undone.`}
+          onConfirm={() => handleDeleteOrder(confirmDeleteId)}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
+      )}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Total Orders", value: "2,847", Icon: ShoppingCart, bg: "bg-blue-600" },
-          { label: "Delivered", value: "2,641", Icon: CheckCircle, bg: "bg-emerald-600" },
-          { label: "In Transit", value: "163", Icon: Truck, bg: "bg-indigo-600" },
-          { label: "Delayed", value: "43", Icon: AlertTriangle, bg: "bg-red-500" },
+          { label: "Total Orders", value: dbOrders.length.toLocaleString(), Icon: ShoppingCart, bg: "bg-blue-600" },
+          { label: "Completed", value: delivered.toLocaleString(), Icon: CheckCircle, bg: "bg-emerald-600" },
+          { label: "Processing", value: dbOrders.filter(o => o.order_status === "PROCESSING").length.toString(), Icon: Truck, bg: "bg-indigo-600" },
+          { label: "Pending", value: delayed.toLocaleString(), Icon: AlertTriangle, bg: "bg-red-500" },
         ].map((m) => (
           <Card key={m.label} className="p-4 flex items-center gap-4">
             <div className={`p-2.5 rounded-xl ${m.bg} flex-shrink-0`}><m.Icon size={18} className="text-white" /></div>
@@ -1542,8 +1906,8 @@ const OrdersPage = () => {
         {/* Orders table */}
         <Card className="lg:col-span-2 p-6">
           <SectionHeader
-            title="Recent Orders"
-            subtitle="Click a row to track shipment"
+            title="Orders (from Database)"
+            subtitle="Click a row to view details"
             action={
               <button onClick={() => setShowNewOrder(true)} className="flex items-center gap-1.5 px-3 py-2 bg-blue-900 text-white rounded-xl text-xs font-semibold hover:bg-blue-800 transition-colors">
                 <Plus size={13} /> New Order
@@ -1551,120 +1915,93 @@ const OrdersPage = () => {
             }
           />
           <div className="overflow-x-auto">
+            {loadingOrders ? (
+              <div className="text-center py-12 text-slate-400"><RefreshCw size={24} className="mx-auto mb-2 animate-spin opacity-40" /><p className="text-sm">Loading orders...</p></div>
+            ) : (
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-100">
-                  {["Order ID", "Supplier", "Product", "Qty", "Order Date", "ETA", "Value", "Status"].map((h) => (
-                    <th key={h} className="text-left py-3 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
-                      {h}
-                    </th>
+                  {["Order ID", "Customer", "Product", "Qty", "Sales", "Profit", "Date", "Status"].map((h) => (
+                    <th key={h} className="text-left py-3 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {orders.map((o, i) => (
+                {dbOrders.slice(0, 100).map((o, i) => (
                   <tr
-                    key={o.id}
-                    onClick={() => setSelectedOrder(selectedOrder === o.id ? null : o.id)}
+                    key={o.order_id}
+                    onClick={() => setSelectedOrderId(selectedOrderId === o.order_id ? null : o.order_id)}
                     className={`border-b border-slate-50 cursor-pointer transition-colors ${
-                      selectedOrder === o.id
+                      selectedOrderId === o.order_id
                         ? "bg-blue-50 ring-1 ring-inset ring-blue-200"
-                        : i % 2 !== 0
-                        ? "bg-slate-50/40 hover:bg-blue-50/40"
-                        : "hover:bg-blue-50/40"
+                        : i % 2 !== 0 ? "bg-slate-50/40 hover:bg-blue-50/40" : "hover:bg-blue-50/40"
                     }`}
                   >
-                    <td className="py-3.5 px-3 text-xs font-mono font-semibold text-blue-600">{o.id}</td>
-                    <td className="py-3.5 px-3 text-xs font-medium text-slate-700 whitespace-nowrap">{o.supplier}</td>
-                    <td className="py-3.5 px-3 text-xs text-slate-500">{o.product}</td>
-                    <td className="py-3.5 px-3 text-xs font-bold text-slate-800">{o.qty}</td>
-                    <td className="py-3.5 px-3 text-xs text-slate-400">{o.date}</td>
-                    <td className="py-3.5 px-3 text-xs text-slate-400">{o.eta}</td>
-                    <td className="py-3.5 px-3 text-sm font-semibold text-slate-800">${o.value.toLocaleString()}</td>
-                    <td className="py-3.5 px-3"><Badge label={o.status} colorClass={statusColor[o.status]} /></td>
+                    <td className="py-3.5 px-3 text-xs font-mono font-semibold text-blue-600">{o.order_id}</td>
+                    <td className="py-3.5 px-3 text-xs font-medium text-slate-700 whitespace-nowrap">{o.customer_fname} {o.customer_lname}</td>
+                    <td className="py-3.5 px-3 text-xs text-slate-500 whitespace-nowrap">{o.product_name}</td>
+                    <td className="py-3.5 px-3 text-xs font-bold text-slate-800">{o.quantity}</td>
+                    <td className="py-3.5 px-3 text-sm font-semibold text-slate-800">${Number(o.sales).toFixed(2)}</td>
+                    <td className="py-3.5 px-3 text-xs font-semibold" style={{color: Number(o.profit) >= 0 ? '#16a34a' : '#dc2626'}}>${Number(o.profit).toFixed(2)}</td>
+                    <td className="py-3.5 px-3 text-xs text-slate-400">{o.order_date?.slice(0,10)}</td>
+                    <td className="py-3.5 px-3"><Badge label={o.order_status} colorClass={statusColor[o.order_status] ?? "bg-slate-100 text-slate-600"} /></td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            )}
           </div>
         </Card>
 
-        {/* Dynamic Timeline */}
+        {/* Order Detail Panel */}
         <Card className="p-6">
           <SectionHeader
-            title="Shipment Timeline"
-            subtitle={selected ? `Tracking: ${selected.id}` : "Select an order to track"}
+            title="Order Details"
+            subtitle={selectedOrder ? `Order #${selectedOrder.order_id}` : "Select an order to view details"}
           />
-          {selected ? (
-            <div className="relative mt-2">
-              {/* Vertical connector */}
-              <div className="absolute left-4 top-4 bottom-4 w-px bg-slate-200" />
-              <div className="space-y-4">
-                {timeline.map((step, i) => {
-                  const isCurrentStep = !step.done && timeline.slice(0, i).every((s) => s.done);
-                  return (
-                    <div key={i} className="flex items-start gap-4">
-                      <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center flex-shrink-0 z-10 relative transition-all ${
-                        step.done
-                          ? "bg-emerald-500 border-emerald-500 shadow-md shadow-emerald-200"
-                          : isCurrentStep
-                          ? selected.status === "Delayed"
-                            ? "bg-amber-50 border-amber-400 ring-2 ring-amber-200"
-                            : "bg-blue-50 border-blue-400 ring-2 ring-blue-200"
-                          : "bg-white border-slate-200"
-                      }`}>
-                        {step.done ? (
-                          <CheckCircle size={14} className="text-white" />
-                        ) : isCurrentStep ? (
-                          selected.status === "Delayed"
-                            ? <AlertTriangle size={12} className="text-amber-500" />
-                            : <div className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-pulse" />
-                        ) : (
-                          <div className="w-2 h-2 rounded-full bg-slate-300" />
-                        )}
-                      </div>
-                      <div className="pt-1 flex-1">
-                        <div className={`text-xs font-semibold ${
-                          step.done ? "text-slate-800"
-                          : isCurrentStep
-                            ? selected.status === "Delayed" ? "text-amber-700" : "text-blue-700"
-                          : "text-slate-400"
-                        }`}>{step.label}</div>
-                        <div className="text-[10px] text-slate-400 mt-0.5">
-                          {step.done
-                            ? (() => {
-                                const base = new Date(2024, 5, parseInt(selected.date.replace("Jun ", ""), 10));
-                                base.setDate(base.getDate() + i * 2);
-                                return base.toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-                              })()
-                            : isCurrentStep && selected.status !== "Delivered"
-                            ? `ETA: ${selected.eta}`
-                            : "Pending"}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {note && (
-                <div className={`mt-5 pt-4 border-t border-slate-100`}>
-                  <div className={`flex items-center gap-2 text-xs rounded-xl px-3 py-2.5 font-medium ${note.bg} ${
-                    selected.status === "Delayed" ? "text-amber-700"
-                    : selected.status === "Delivered" ? "text-emerald-700"
-                    : selected.status === "In Transit" ? "text-indigo-700"
-                    : "text-blue-700"
-                  }`}>
-                    {note.icon}
-                    <span>{note.text}</span>
-                  </div>
+          {selectedOrder ? (
+            <div className="space-y-3">
+              {[
+                { label: "Order ID", value: selectedOrder.order_id },
+                { label: "Customer", value: `${selectedOrder.customer_fname} ${selectedOrder.customer_lname}` },
+                { label: "Product", value: selectedOrder.product_name },
+                { label: "Quantity", value: selectedOrder.quantity },
+                { label: "Sales", value: `$${Number(selectedOrder.sales).toFixed(2)}` },
+                { label: "Profit", value: `$${Number(selectedOrder.profit).toFixed(2)}` },
+                { label: "Payment", value: selectedOrder.payment_type },
+                { label: "Order Date", value: selectedOrder.order_date?.slice(0,10) },
+              ].map(f => (
+                <div key={String(f.label)} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{f.label}</span>
+                  <span className="text-sm font-semibold text-slate-800">{f.value}</span>
                 </div>
-              )}
+              ))}
+              <div className="py-2.5 border-b border-slate-50 flex justify-between items-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</span>
+                <select
+                  value={selectedOrder.order_status}
+                  onChange={(e) => handleUpdateStatus(selectedOrder.order_id, e.target.value)}
+                  className="px-2 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 font-semibold text-slate-800"
+                >
+                  {["PENDING", "PROCESSING", "COMPLETE", "ON_HOLD", "CLOSED", "CANCELED"].map(st => (
+                    <option key={st} value={st}>{st}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="pt-4 flex gap-2">
+                <button
+                  onClick={() => setConfirmDeleteId(selectedOrder.order_id)}
+                  className="flex-1 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 border border-red-200"
+                >
+                  <Trash2 size={13} /> Delete Order
+                </button>
+              </div>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-52 text-slate-300">
-              <Truck size={40} className="mb-3 opacity-50" />
+              <ShoppingCart size={40} className="mb-3 opacity-50" />
               <p className="text-sm font-medium text-slate-400">Select an order row</p>
-              <p className="text-xs text-slate-300 mt-1">to view shipment tracking</p>
+              <p className="text-xs text-slate-300 mt-1">to view order details</p>
             </div>
           )}
         </Card>

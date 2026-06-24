@@ -1,10 +1,13 @@
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required
 from backend.models.database import execute_query
 from datetime import datetime
+from backend.middleware.auth_middleware import admin_required
 
 shipments_bp = Blueprint("shipments", __name__, url_prefix="/api/shipments")
 
 @shipments_bp.route("", methods=["GET"])
+@jwt_required()
 def get_all_shipments():
     try:
         query = """
@@ -34,6 +37,7 @@ def get_all_shipments():
         return jsonify({"error": f"Failed to fetch shipments: {str(e)}"}), 500
 
 @shipments_bp.route("/<int:shipment_id>", methods=["GET"])
+@jwt_required()
 def get_shipment(shipment_id):
     try:
         query = """
@@ -71,6 +75,7 @@ def get_shipment(shipment_id):
         return jsonify({"error": f"Failed to fetch shipment: {str(e)}"}), 500
 
 @shipments_bp.route("/<int:shipment_id>", methods=["PUT"])
+@admin_required
 def update_shipment_tracking(shipment_id):
     """Updates shipment with real shipping dates and recalculates delays/delivery status."""
     data = request.get_json() or {}

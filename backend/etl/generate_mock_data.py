@@ -36,57 +36,62 @@ def generate_data(num_records=18500):
     markets = ["Pacific Asia", "USCA", "Latin America", "Europe", "Africa"]
     
     categories = [
-        (1, "Cleats", "Apparel"),
-        (2, "Men's Footwear", "Footwear"),
-        (3, "Women's Apparel", "Apparel"),
-        (4, "Indoor/Outdoor Games", "Outdoors"),
-        (5, "Water Sports", "Outdoors"),
-        (6, "Camping & Hiking", "Outdoors"),
-        (7, "Cardio Equipment", "Fitness"),
-        (8, "Shop By Sport", "Apparel"),
-        (9, "Golf", "Outdoors"),
-        (10, "Electronics", "Electronics")
+        (1, "Industrial Steel", "Metals"),
+        (2, "Electrical Equipment", "Power"),
+        (3, "Cement & Construction", "Materials"),
+        (4, "Automotive Parts", "Machinery"),
+        (5, "Pipes & Fittings", "Hardware"),
+        (6, "Industrial Polymers", "Chemicals"),
+        (7, "Packaging & Storage", "Logistics"),
+        (8, "Textiles & Safety Wear", "Apparel"),
+        (9, "Paints & Coatings", "Chemicals"),
+        (10, "Control & Automation", "Electronics")
     ]
     
     product_names = {
-        1: ["Adidas Men's F10", "Nike Cleats", "Puma King Cleats"],
-        2: ["Nike Men's Free 5.0+", "Under Armour Running Shoes", "Adidas Originals"],
-        3: ["Nike Women's Running Shoes", "Adidas Sports Bra", "Under Armour Leggings"],
-        4: ["Ona Offroad Games", "Spikeball Set", "Cornhole Toss Game"],
-        5: ["Pelican Sport Kayak", "Life Vest Blue", "Snorkel Mask goggles"],
-        6: ["Coleman 4-Person Tent", "Sleeping Bag Cold Weather", "Hiking Backpack 50L"],
-        7: ["ProForm Treadmill", "Sole F85 Treadmill", "Schwinn Elliptical"],
-        8: ["Under Armour Men's Armour Fleece", "Nike Golf Shirt", "Puma Training Top"],
-        9: ["TaylorMade M2 Driver", "Callaway Iron Set", "Titleist Pro V1 Golf Balls"],
-        10: ["Apple Watch Series 3", "Bose Wireless Headphones", "Fitbit Charge 2"]
+        1: ["Tata Steel HR Sheets", "JSW NeoSteel Rebars", "Sail Structural Beams"],
+        2: ["Havells Switchgear 63A", "Bajaj Distribution Transformer", "Polycab Copper Cables 100m"],
+        3: ["UltraTech Premium Cement Bag", "Ambuja Kavach Waterproof Cement", "ACC Gold Cement Bag"],
+        4: ["Exide Heavy Duty Battery 12V", "Bosch India Disc Brake Pads", "Mahindra Tractor Alternators"],
+        5: ["Supreme PVC Pressure Pipes", "Astral CPVC Pipe Fittings", "Prince SWR Pipes 3m"],
+        6: ["Reliance PVC Resin Granules", "Haldia Polyethylene Pellets", "Pidilite Fevicol SH 5kg"],
+        7: ["Wimplast Heavy Storage Crates", "Nilkamal Plastic Pallets", "Hindustan Tin Containers"],
+        8: ["Raymond Safety Jackets", "Arvind Protective Hand Gloves", "Siyarams Industrial Overalls"],
+        9: ["Asian Paints Apcolite Primer", "Berger Industrial Epoxy Paint", "Nerolac Rust Protector 20L"],
+        10: ["L&T Control Panel Board", "Schneider India Digital Meters", "Siemens AC Drive 5HP"]
     }
     
     cities = [
-        ("Caguas", "PR", "Puerto Rico"), ("Chicago", "IL", "US"), ("Los Angeles", "CA", "US"),
-        ("Brooklyn", "NY", "US"), ("Houston", "TX", "US"), ("Miami", "FL", "US"),
-        ("San Francisco", "CA", "US"), ("Seattle", "WA", "US"), ("Boston", "MA", "US"),
-        ("Atlanta", "GA", "US")
+        ("Mumbai", "MH", "India"), ("Delhi", "DL", "India"), ("Bengaluru", "KA", "India"),
+        ("Kolkata", "WB", "India"), ("Chennai", "TN", "India"), ("Hyderabad", "TG", "India"),
+        ("Pune", "MH", "India"), ("Ahmedabad", "GJ", "India"), ("Jaipur", "RJ", "India"),
+        ("Lucknow", "UP", "India")
     ]
     
     order_cities = [
-        ("Santo Domingo", "Dominican Republic", "LATAM"), ("San Jose", "Costa Rica", "LATAM"),
-        ("Los Angeles", "United States", "USCA"), ("Paris", "France", "Europe"),
-        ("Tokyo", "Japan", "Pacific Asia"), ("Sydney", "Australia", "Pacific Asia"),
-        ("London", "United Kingdom", "Europe"), ("Berlin", "Germany", "Europe"),
-        ("Cairo", "Egypt", "Africa"), ("Mumbai", "India", "Pacific Asia")
+        ("Mumbai", "India", "West"), ("Delhi", "India", "North"),
+        ("Bengaluru", "India", "South"), ("Kolkata", "India", "East"),
+        ("Chennai", "India", "South"), ("Hyderabad", "India", "South"),
+        ("Pune", "India", "West"), ("Ahmedabad", "India", "West"),
+        ("Jaipur", "India", "North"), ("Lucknow", "India", "North")
     ]
     
     order_statuses = ["COMPLETE", "PROCESSING", "PENDING", "PENDING_PAYMENT", "CLOSED", "CANCELED", "ON_HOLD"]
     
     # Pre-generate lists to map consistently
+    first_names = ["Rajesh", "Amit", "Sanjay", "Anil", "Sunil", "Dinesh", "Suresh", "Vijay", "Ramesh", "Deepak",
+                   "Priya", "Sunita", "Anita", "Ritu", "Neha", "Pooja", "Asha", "Kiran", "Meena", "Jyoti"]
+    last_names = ["Kumar", "Sharma", "Singh", "Patel", "Gupta", "Rao", "Reddy", "Joshi", "Das", "Mehta",
+                  "Gupta", "Sen", "Nair", "Verma", "Prasad", "Mishra", "Pandey", "Choudhury", "Bose", "Menon"]
+
     customers = []
     for c_id in range(1, 1001):
-        fname = f"CustFirst{c_id}"
-        lname = f"CustLast{c_id}"
-        email = f"user_{c_id}@example.com"
+        fname = random.choice(first_names)
+        lname = random.choice(last_names)
+        email = f"{fname.lower()}.{lname.lower()}_{c_id}@example.com"
         segment = random.choice(customer_segments)
         city, state, country = random.choice(cities)
-        zipcode = f"{random.randint(10000, 99999)}"
+        zipcode = f"{random.randint(110001, 850000)}"
         customers.append({
             "id": c_id, "fname": fname, "lname": lname, "email": email,
             "segment": segment, "city": city, "state": state, "country": country, "zipcode": zipcode
@@ -106,7 +111,7 @@ def generate_data(num_records=18500):
             customer = random.choice(customers)
             cat_id, cat_name, dept_name = random.choice(categories)
             prod_name = random.choice(product_names[cat_id])
-            prod_price = round(random.uniform(15.0, 350.0), 2)
+            prod_price = round(random.uniform(3000.0, 150000.0), 2)
             
             qty = random.randint(1, 5)
             sales = round(prod_price * qty, 2)
@@ -199,8 +204,8 @@ def generate_data(num_records=18500):
                 sales,                              # Sales (Gross Sales)
                 item_total,                         # Order Item Total (Net Sales)
                 profit,                             # Order Profit Per Order
-                "Region XYZ",                       # Order Region
-                "State XYZ",                        # Order State
+                market,                             # Order Region
+                customer["state"],                  # Order State
                 status,                             # Order Status
                 "12345",                            # Order Zipcode
                 cat_id * 100 + 1,                   # Product Card Id

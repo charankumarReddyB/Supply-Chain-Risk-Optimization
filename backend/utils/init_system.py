@@ -22,8 +22,8 @@ def init_system():
         print("Make sure your MySQL server is running and configured correctly in config.py.")
         sys.exit(1)
         
-    # 2. Seed Admin User
-    print("\nStep 2: Seeding admin user...")
+    # 2. Seed Admin and User accounts
+    print("\nStep 2: Seeding admin and user accounts...")
     try:
         # Check if admin exists
         admin_check = execute_query("SELECT id FROM users WHERE username = 'admin'")
@@ -34,13 +34,24 @@ def init_system():
                 ("admin", hashed_pwd, "admin@supplychain.com", "admin"),
                 fetch=False
             )
-            print("Admin user created successfully.")
-            print("Username: admin")
-            print("Password: admin123")
+            print("Admin user created successfully (admin/admin123).")
         else:
             print("Admin user already exists.")
+
+        # Check if user exists
+        user_check = execute_query("SELECT id FROM users WHERE username = 'user'")
+        if not user_check:
+            hashed_pwd = generate_password_hash("user123")
+            execute_query(
+                "INSERT INTO users (username, password_hash, email, role) VALUES (%s, %s, %s, %s)",
+                ("user", hashed_pwd, "user@supplychain.com", "user"),
+                fetch=False
+            )
+            print("Regular user created successfully (user/user123).")
+        else:
+            print("Regular user already exists.")
     except Exception as e:
-        print(f"Error seeding admin user: {e}")
+        print(f"Error seeding user accounts: {e}")
         
     # 3. Generate Mock Data
     print("\nStep 3: Generating mock DataCo CSV dataset...")

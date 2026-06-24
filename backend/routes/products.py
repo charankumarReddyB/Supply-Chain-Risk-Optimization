@@ -1,156 +1,160 @@
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required
 from backend.models.database import execute_query
+from backend.middleware.auth_middleware import admin_required
 
 products_bp = Blueprint("products", __name__, url_prefix="/api/products")
 
 @products_bp.route("", methods=["GET"])
+@jwt_required()
 def get_all_products():
     try:
-        products = execute_query("SELECT * FROM products")
+        products = execute_query("SELECT * FROM products ORDER BY product_id")
+        for p in products:
+            p["currency"] = "INR"
         return jsonify(products), 200
     except Exception as e:
         return jsonify({"error": f"Failed to fetch products: {str(e)}"}), 500
 
 @products_bp.route("/<int:product_id>", methods=["GET"])
+@jwt_required()
 def get_product(product_id):
     try:
         product = execute_query("SELECT * FROM products WHERE product_id = %s", (product_id,))
         if not product:
             return jsonify({"error": "Product not found"}), 404
-        return jsonify(product[0]), 200
+        p_dict = product[0]
+        p_dict["currency"] = "INR"
+        return jsonify(p_dict), 200
     except Exception as e:
         return jsonify({"error": f"Failed to fetch product: {str(e)}"}), 500
 
 @products_bp.route("", methods=["POST"])
+@admin_required
 def create_product():
     data = request.get_json() or {}
-    product_id = data.get("product_id")
-    category_id = data.get("category_id")
-    category_name = data.get("category_name")
-    product_name = data.get("product_name")
+    product_id   = data.get("product_id")
+    category_id  = data.get("category_id", 1)
+    category_name = data.get("category_name", "General")
+    product_name  = data.get("product_name")
     product_price = data.get("product_price")
     product_status = data.get("product_status", "0")
-    description = data.get("description", "")
-    
-    if not product_id or not product_name or product_price is None:
-        return jsonify({"error": "product_id, product_name, and product_price are required fields"}), 400
-        
+    description  = data.get("description", "")
+
+    if not product_id:
+        try:
+            max_id_res = execute_query("SELECT MAX(product_id) as max_id FROM products")
+            max_id = max_id_res[0]["max_id"] if max_id_res and max_id_res[0]["max_id"] is not None else 1000
+            product_id = max_id + 1
+        except Exception as e:
+            return jsonify({"error": f"Failed to auto-generate product_id: {str(e)}"}), 500
+
+    if not product_name or product_price is None:
+        return jsonify({"error": "product_name and product_price are required"}), 400
+
     try:
-        # Check if ID exists
         existing = execute_query("SELECT product_id FROM products WHERE product_id = %s", (product_id,))
         if existing:
-            return jsonify({"error": f"Product with ID {product_id} already exists"}), 400
-            
-        # OLTP insert
+            return jsonify({"error": f"Product with ID {product_id} already exists"}), 409
+
         execute_query(
-            """INSERT INTO products (product_id, category_id, category_name, product_name, product_price, product_status, description) 
+            """INSERT INTO products (product_id, category_id, category_name, product_name, product_price, product_status, description)
                VALUES (%s, %s, %s, %s, %s, %s, %s)""",
             (product_id, category_id, category_name, product_name, product_price, product_status, description),
             fetch=False
         )
-        
-        # OLAP insert
-        execute_query(
-            """INSERT INTO dim_product (Product_ID, Product_Category_Id, Product_Category_Name, Product_Name, Product_Price, Product_Status) 
-               VALUES (%s, %s, %s, %s, %s, %s)""",
-            (product_id, category_id, category_name, product_name, product_price, product_status),
-            fetch=False
-        )
-        
-        # Initialize Inventory in OLTP for this product
-        execute_query(
-            """INSERT INTO inventory (product_id, warehouse_id, stock_level, reorder_point, safety_stock, lead_time_days) 
-               VALUES (%s, 1, 100, 50, 10, 5)""",
-            (product_id,),
-            fetch=False
-        )
-        
+
+        # OLAP sync
+        try:
+            execute_query(
+                """INSERT INTO dim_product (Product_ID, Product_Category_Id, Product_Category_Name, Product_Name, Product_Price, Product_Status)
+                   VALUES (%s, %s, %s, %s, %s, %s)""",
+                (product_id, category_id, category_name, product_name, product_price, product_status),
+                fetch=False
+            )
+        except Exception:
+            pass
+
+        # Initialize inventory (default warehouse 1)
+        try:
+            execute_query(
+                """INSERT INTO inventory (product_id, warehouse_id, stock_level, reorder_point, safety_stock, lead_time_days)
+                   VALUES (%s, 1, 100, 50, 10, 5)""",
+                (product_id,),
+                fetch=False
+            )
+        except Exception:
+            pass
+
         return jsonify({"message": "Product created successfully"}), 201
     except Exception as e:
         return jsonify({"error": f"Failed to create product: {str(e)}"}), 500
 
 @products_bp.route("/<int:product_id>", methods=["PUT"])
+@admin_required
 def update_product(product_id):
     data = request.get_json() or {}
-    category_id = data.get("category_id")
-    category_name = data.get("category_name")
-    product_name = data.get("product_name")
-    product_price = data.get("product_price")
-    product_status = data.get("product_status")
-    description = data.get("description")
-    
+
     try:
-        # Check if exists
         existing = execute_query("SELECT product_id FROM products WHERE product_id = %s", (product_id,))
         if not existing:
             return jsonify({"error": "Product not found"}), 404
-            
-        fields = []
-        params = []
-        dim_fields = []
-        dim_params = []
-        
-        if category_id is not None:
-            fields.append("category_id = %s")
-            params.append(category_id)
-            dim_fields.append("Product_Category_Id = %s")
-            dim_params.append(category_id)
-        if category_name:
-            fields.append("category_name = %s")
-            params.append(category_name)
-            dim_fields.append("Product_Category_Name = %s")
-            dim_params.append(category_name)
-        if product_name:
-            fields.append("product_name = %s")
-            params.append(product_name)
-            dim_fields.append("Product_Name = %s")
-            dim_params.append(product_name)
-        if product_price is not None:
-            fields.append("product_price = %s")
-            params.append(product_price)
-            dim_fields.append("Product_Price = %s")
-            dim_params.append(product_price)
-        if product_status:
-            fields.append("product_status = %s")
-            params.append(product_status)
-            dim_fields.append("Product_Status = %s")
-            dim_params.append(product_status)
-        if description:
-            fields.append("description = %s")
-            params.append(description)
-            
+
+        fields, params, dim_fields, dim_params = [], [], [], []
+
+        mappings = [
+            ("category_id", "Product_Category_Id"),
+            ("category_name", "Product_Category_Name"),
+            ("product_name", "Product_Name"),
+            ("product_price", "Product_Price"),
+            ("product_status", "Product_Status"),
+        ]
+        for oltp_col, olap_col in mappings:
+            val = data.get(oltp_col)
+            if val is not None:
+                fields.append(f"{oltp_col} = %s"); params.append(val)
+                dim_fields.append(f"{olap_col} = %s"); dim_params.append(val)
+
+        if data.get("description") is not None:
+            fields.append("description = %s"); params.append(data["description"])
+
         if fields:
             params.append(product_id)
             execute_query(f"UPDATE products SET {', '.join(fields)} WHERE product_id = %s", params, fetch=False)
-            
+
         if dim_fields:
             dim_params.append(product_id)
             execute_query(f"UPDATE dim_product SET {', '.join(dim_fields)} WHERE Product_ID = %s", dim_params, fetch=False)
-            
+
         return jsonify({"message": "Product updated successfully"}), 200
     except Exception as e:
         return jsonify({"error": f"Failed to update product: {str(e)}"}), 500
 
 @products_bp.route("/<int:product_id>", methods=["DELETE"])
+@admin_required
 def delete_product(product_id):
     try:
-        # Check if exists
         existing = execute_query("SELECT product_id FROM products WHERE product_id = %s", (product_id,))
         if not existing:
             return jsonify({"error": "Product not found"}), 404
-            
+
+        execute_query("DELETE FROM inventory WHERE product_id = %s", (product_id,), fetch=False)
         execute_query("DELETE FROM products WHERE product_id = %s", (product_id,), fetch=False)
-        execute_query("DELETE FROM dim_product WHERE Product_ID = %s", (product_id,), fetch=False)
+        try:
+            execute_query("DELETE FROM dim_product WHERE Product_ID = %s", (product_id,), fetch=False)
+        except Exception:
+            pass
         return jsonify({"message": "Product deleted successfully"}), 200
     except Exception as e:
         return jsonify({"error": f"Failed to delete product: {str(e)}"}), 500
 
 @products_bp.route("/high-risk", methods=["GET"])
+@jwt_required()
 def get_high_risk_products():
     """Returns products frequently associated with late deliveries or negative profit."""
     try:
         query = """
-            SELECT 
+            SELECT
                 p.Product_ID as product_id,
                 p.Product_Name as product_name,
                 p.Product_Category_Name as category,

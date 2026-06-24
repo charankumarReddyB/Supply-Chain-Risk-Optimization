@@ -1,10 +1,13 @@
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required
 from backend.models.database import execute_query
 from datetime import datetime
+from backend.middleware.auth_middleware import admin_required
 
 orders_bp = Blueprint("orders", __name__, url_prefix="/api/orders")
 
 @orders_bp.route("", methods=["GET"])
+@jwt_required()
 def get_all_orders():
     try:
         # Fetch detailed order list joining customer and product
@@ -29,15 +32,17 @@ def get_all_orders():
             LIMIT 100
         """
         orders = execute_query(query)
-        # Format date for JSON
+        # Format date for JSON and add currency
         for o in orders:
             if isinstance(o["order_date"], datetime):
                 o["order_date"] = o["order_date"].strftime("%Y-%m-%d %H:%M:%S")
+            o["currency"] = "INR"
         return jsonify(orders), 200
     except Exception as e:
         return jsonify({"error": f"Failed to fetch orders: {str(e)}"}), 500
 
 @orders_bp.route("/<int:order_id>", methods=["GET"])
+@jwt_required()
 def get_order_details(order_id):
     try:
         query = """
@@ -66,6 +71,7 @@ def get_order_details(order_id):
         order_dict = order[0]
         if isinstance(order_dict["order_date"], datetime):
             order_dict["order_date"] = order_dict["order_date"].strftime("%Y-%m-%d %H:%M:%S")
+        order_dict["currency"] = "INR"
             
         # Get shipment info if available
         shipment = execute_query("SELECT * FROM shipments WHERE order_id = %s", (order_id,))
@@ -82,6 +88,7 @@ def get_order_details(order_id):
         return jsonify({"error": f"Failed to fetch order: {str(e)}"}), 500
 
 @orders_bp.route("", methods=["POST"])
+@admin_required
 def create_order():
     data = request.get_json() or {}
     order_id = data.get("order_id")
@@ -98,8 +105,16 @@ def create_order():
     shipping_mode = data.get("shipping_mode", "Standard Class")
     days_shipment_scheduled = data.get("days_shipment_scheduled", 4)
     
-    if not order_id or not customer_id or not product_id or sales is None or profit is None:
-        return jsonify({"error": "order_id, customer_id, product_id, sales, and profit are required"}), 400
+    if not order_id:
+        try:
+            max_id_res = execute_query("SELECT MAX(order_id) as max_id FROM orders")
+            max_id = max_id_res[0]["max_id"] if max_id_res and max_id_res[0]["max_id"] is not None else 200000
+            order_id = max_id + 1
+        except Exception as e:
+            return jsonify({"error": f"Failed to auto-generate order_id: {str(e)}"}), 500
+
+    if not customer_id or not product_id or sales is None or profit is None:
+        return jsonify({"error": "customer_id, product_id, sales, and profit are required"}), 400
         
     try:
         # Check order_id uniqueness
@@ -130,7 +145,8 @@ def create_order():
         )
         
         # Create default shipment in OLTP
-        ship_date = datetime.now() + pd.Timedelta(days=days_shipment_scheduled)
+        from datetime import timedelta as _td
+        ship_date = datetime.now() + _td(days=days_shipment_scheduled)
         ship_date_str = ship_date.strftime("%Y-%m-%d %H:%M:%S")
         
         execute_query(
@@ -192,6 +208,7 @@ def create_order():
         return jsonify({"error": f"Failed to create order: {str(e)}"}), 500
 
 @orders_bp.route("/<int:order_id>", methods=["PUT"])
+@admin_required
 def update_order_status(order_id):
     data = request.get_json() or {}
     order_status = data.get("order_status")
@@ -210,6 +227,7 @@ def update_order_status(order_id):
         return jsonify({"error": f"Failed to update order: {str(e)}"}), 500
 
 @orders_bp.route("/<int:order_id>", methods=["DELETE"])
+@admin_required
 def delete_order(order_id):
     try:
         existing = execute_query("SELECT order_id FROM orders WHERE order_id = %s", (order_id,))

@@ -1,0 +1,65 @@
+{
+    "accuracy": 0.3154,
+    "precision_weighted": 0.4334,
+    "recall_weighted": 0.3154,
+    "f1_score_weighted": 0.3003,
+    "confusion_matrix": {
+        "High": {
+            "High": 455,
+            "Low": 117,
+            "Medium": 94
+        },
+        "Low": {
+            "High": 636,
+            "Low": 451,
+            "Medium": 149
+        },
+        "Medium": {
+            "High": 1056,
+            "Low": 481,
+            "Medium": 261
+        }
+    },
+    "per_class_metrics": {
+        "High": {
+            "precision": 0.2119,
+            "recall": 0.6832,
+            "f1_score": 0.3235,
+            "support": 666
+        },
+        "Low": {
+            "precision": 0.4299,
+            "recall": 0.3649,
+            "f1_score": 0.3947,
+            "support": 1236
+        },
+        "Medium": {
+            "precision": 0.5179,
+            "recall": 0.1452,
+            "f1_score": 0.2268,
+            "support": 1798
+        }
+    },
+    "feature_importance": {
+        "Days for shipment (scheduled)": 0.31481015296621906,
+        "Sales": 0.24049164863586006,
+        "Product Price": 0.2108081654463589,
+        "Category Name": 0.09188794700838551,
+        "Order Item Discount Rate": 0.08232161464421532,
+        "Shipping Mode": 0.03679438674743048,
+        "Customer Segment": 0.022886084551530687
+    },
+    "classes": [
+        "High",
+        "Low",
+        "Medium"
+    ],
+    "train_samples": 14800,
+    "test_samples": 3700,
+    "model_params": {
+        "max_depth": 8,
+        "min_samples_split": 10,
+        "min_samples_leaf": 5,
+        "class_weight": "balanced"
+    }
+}

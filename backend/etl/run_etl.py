@@ -1,4 +1,5 @@
 import os
+import random
 import pandas as pd
 import numpy as np
 import pymysql
@@ -98,11 +99,11 @@ def run_etl_pipeline():
         # Load Reference Data
         # Suppliers
         suppliers_data = [
-            (1, "Global Logistics & Parts", "info@globallogistics.com", "+1-800-555-0199", 4.8, "Active"),
-            (2, "Apex Manufacturing", "sales@apexmanufacturing.com", "+1-800-555-0145", 3.2, "Active"),
-            (3, "Summit Tech Supplies", "support@summittech.com", "+1-800-555-0182", 4.5, "Active"),
-            (4, "Prime Materials Corp", "orders@primematerials.com", "+1-800-555-0121", 2.9, "Active"),
-            (5, "Swift Distributing", "logistics@swiftdist.com", "+1-800-555-0164", 4.1, "Active")
+            (1, "Bharat Metals & Logistics", "info@bharatmetals.in", "+91-98765-43210", 4.8, "Active"),
+            (2, "Krishna Industrial Manufacturing", "sales@krishnamfg.in", "+91-98765-43211", 3.2, "Active"),
+            (3, "Adani Supply Chain Solutions", "support@adanilogistics.in", "+91-98765-43212", 4.5, "Active"),
+            (4, "Tata Steel & Materials Corp", "orders@tatasteel.in", "+91-98765-43213", 2.9, "Active"),
+            (5, "Mahindra Swift Distributing", "logistics@mahindradist.in", "+91-98765-43214", 4.1, "Active")
         ]
         with conn.cursor() as cursor:
             cursor.executemany(
@@ -116,9 +117,9 @@ def run_etl_pipeline():
             
         # Warehouses
         warehouses_data = [
-            (1, "East Coast Hub", "New York", "NY", "USA", 50000, "John Smith"),
-            (2, "Midwest Logistics Center", "Chicago", "IL", "USA", 75000, "Sarah Connor"),
-            (3, "West Coast Fulfillment", "Los Angeles", "CA", "USA", 60000, "David Miller")
+            (1, "West India Fulfillment Hub", "Mumbai", "MH", "India", 50000, "Rajesh Sharma"),
+            (2, "North India Logistics Hub", "Delhi", "DL", "India", 75000, "Amit Patel"),
+            (3, "South India Logistics Hub", "Chennai", "TN", "India", 60000, "Karthik Srinivasan")
         ]
         with conn.cursor() as cursor:
             cursor.executemany(
@@ -340,6 +341,5 @@ def run_etl_pipeline():
     finally:
         conn.close()
 
-import random
 if __name__ == "__main__":
     run_etl_pipeline()

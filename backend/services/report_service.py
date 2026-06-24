@@ -408,3 +408,167 @@ class ReportService:
         doc.build(story, canvasmaker=NumberedCanvas)
         print(f"PDF report generated at: {output_path}")
         return output_path
+
+    @staticmethod
+    def generate_risk_summary_pdf(output_path):
+        """Generates a focused Risk Summary PDF report with distribution table."""
+        risk_data = execute_query("""
+            SELECT
+                Risk_Level,
+                COUNT(*) AS Count,
+                ROUND(SUM(Sales), 2) AS Total_Revenue,
+                ROUND(SUM(Profit), 2) AS Total_Profit,
+                ROUND(AVG(Delivery_Delay), 2) AS Avg_Delay,
+                ROUND(COUNT(*) / (SELECT COUNT(*) FROM fact_order) * 100, 2) AS Percentage
+            FROM fact_order
+            GROUP BY Risk_Level
+            ORDER BY FIELD(Risk_Level, 'High', 'Medium', 'Low')
+        """)
+
+        doc = SimpleDocTemplate(output_path, pagesize=letter,
+                                rightMargin=54, leftMargin=54, topMargin=72, bottomMargin=72)
+        styles = getSampleStyleSheet()
+
+        style_heading = ParagraphStyle('H', parent=styles['Heading2'], fontName='Helvetica-Bold',
+                                       fontSize=16, textColor=colors.HexColor("#2B6CB0"),
+                                       spaceBefore=15, spaceAfter=10)
+        style_body = ParagraphStyle('B', parent=styles['Normal'], fontName='Helvetica',
+                                    fontSize=10, leading=14, textColor=colors.HexColor("#2D3748"))
+        style_th = ParagraphStyle('TH', parent=styles['Normal'], fontName='Helvetica-Bold',
+                                   fontSize=9, textColor=colors.white)
+        style_td = ParagraphStyle('TD', parent=styles['Normal'], fontName='Helvetica',
+                                   fontSize=9, textColor=colors.HexColor("#2D3748"))
+
+        story = [
+            Paragraph("Risk Summary Report", style_heading),
+            Paragraph(f"Generated on {datetime.now().strftime('%B %d, %Y at %H:%M')}", style_body),
+            Spacer(1, 20)
+        ]
+
+        header = [[Paragraph(h, style_th) for h in
+                   ["Risk Level", "Orders", "Revenue ($)", "Profit ($)", "Avg Delay (Days)", "% of Total"]]]
+        row_colors = {"High": colors.HexColor("#FED7D7"), "Medium": colors.HexColor("#FEFCBF"), "Low": colors.HexColor("#C6F6D5")}
+
+        table_data = header
+        for row in risk_data:
+            table_data.append([
+                Paragraph(row["Risk_Level"], style_td),
+                Paragraph(str(row["Count"]), style_td),
+                Paragraph(f"${row['Total_Revenue']:,.2f}", style_td),
+                Paragraph(f"${row['Total_Profit']:,.2f}", style_td),
+                Paragraph(str(row["Avg_Delay"]), style_td),
+                Paragraph(f"{row['Percentage']}%", style_td),
+            ])
+
+        t = Table(table_data, colWidths=[80, 60, 90, 80, 90, 64])
+        row_style_cmds = [('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#2B6CB0")),
+                          ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+                          ('PADDING', (0, 0), (-1, -1), 6), ('ALIGN', (0, 0), (-1, -1), 'LEFT')]
+        for i, row in enumerate(risk_data, start=1):
+            bg = row_colors.get(row["Risk_Level"], colors.white)
+            row_style_cmds.append(('BACKGROUND', (0, i), (-1, i), bg))
+        t.setStyle(TableStyle(row_style_cmds))
+        story.append(t)
+
+        doc.build(story)
+        return output_path
+
+    @staticmethod
+    def generate_supplier_performance_excel(output_path):
+        """Generates a detailed Supplier Performance Excel report."""
+        supplier_df = pd.DataFrame(execute_query("""
+            SELECT
+                s.Supplier_Name, s.Supplier_Rating AS Rating, s.Supplier_Status AS Status,
+                COUNT(f.Fact_ID) AS Total_Orders,
+                ROUND(SUM(f.Sales), 2) AS Total_Sales,
+                ROUND(SUM(f.Profit), 2) AS Total_Profit,
+                ROUND(AVG(f.Delivery_Delay), 2) AS Avg_Delay_Days,
+                SUM(CASE WHEN f.Delivery_Delay > 0 THEN 1 ELSE 0 END) AS Delayed_Orders,
+                SUM(CASE WHEN f.Risk_Level = 'High' THEN 1 ELSE 0 END) AS High_Risk,
+                SUM(CASE WHEN f.Risk_Level = 'Low' THEN 1 ELSE 0 END) AS Low_Risk
+            FROM dim_supplier s
+            LEFT JOIN fact_order f ON s.Supplier_ID = f.Supplier_ID
+            GROUP BY s.Supplier_ID, s.Supplier_Name, s.Supplier_Rating, s.Supplier_Status
+            ORDER BY Rating DESC
+        """))
+
+        with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
+            supplier_df.to_excel(writer, sheet_name="Supplier Performance", index=False)
+        return output_path
+
+    @staticmethod
+    def generate_monthly_report_excel(output_path, year=None, month=None):
+        """Generates a monthly performance Excel report filtered by year/month."""
+        conditions = []
+        if year:
+            conditions.append(f"d.Year = {int(year)}")
+        if month:
+            conditions.append(f"d.Month = {int(month)}")
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+        monthly_df = pd.DataFrame(execute_query(f"""
+            SELECT
+                d.Year, d.Month, d.Month_Name,
+                COUNT(DISTINCT f.Order_ID) AS Total_Orders,
+                SUM(f.Quantity) AS Units_Sold,
+                ROUND(SUM(f.Sales), 2) AS Monthly_Revenue,
+                ROUND(SUM(f.Profit), 2) AS Monthly_Profit,
+                ROUND(AVG(f.Delivery_Delay), 2) AS Avg_Delay,
+                SUM(CASE WHEN f.Risk_Level = 'High' THEN 1 ELSE 0 END) AS High_Risk
+            FROM fact_order f
+            JOIN dim_date d ON f.Date_ID = d.Date_ID
+            {where}
+            GROUP BY d.Year, d.Month, d.Month_Name
+            ORDER BY d.Year ASC, d.Month ASC
+        """))
+
+        risk_df = pd.DataFrame(execute_query(f"""
+            SELECT f.Risk_Level, COUNT(*) AS Count, ROUND(SUM(f.Sales), 2) AS Revenue
+            FROM fact_order f
+            JOIN dim_date d ON f.Date_ID = d.Date_ID
+            {where}
+            GROUP BY f.Risk_Level
+        """))
+
+        with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
+            monthly_df.to_excel(writer, sheet_name="Monthly Performance", index=False)
+            risk_df.to_excel(writer, sheet_name="Risk Distribution", index=False)
+        return output_path
+
+    @staticmethod
+    def generate_yearly_report_excel(output_path, year=None):
+        """Generates a yearly summary Excel report."""
+        year_filter = f"WHERE d.Year = {int(year)}" if year else ""
+
+        yearly_df = pd.DataFrame(execute_query(f"""
+            SELECT
+                d.Year,
+                COUNT(DISTINCT f.Order_ID) AS Total_Orders,
+                ROUND(SUM(f.Sales), 2) AS Annual_Revenue,
+                ROUND(SUM(f.Profit), 2) AS Annual_Profit,
+                ROUND(AVG(f.Delivery_Delay), 2) AS Avg_Delay,
+                SUM(CASE WHEN f.Risk_Level = 'High' THEN 1 ELSE 0 END) AS High_Risk,
+                SUM(CASE WHEN f.Risk_Level = 'Medium' THEN 1 ELSE 0 END) AS Med_Risk,
+                SUM(CASE WHEN f.Risk_Level = 'Low' THEN 1 ELSE 0 END) AS Low_Risk
+            FROM fact_order f
+            JOIN dim_date d ON f.Date_ID = d.Date_ID
+            {year_filter}
+            GROUP BY d.Year
+            ORDER BY d.Year ASC
+        """))
+
+        top_products_df = pd.DataFrame(execute_query(f"""
+            SELECT p.Product_Name, SUM(f.Quantity) AS Units_Sold,
+                   ROUND(SUM(f.Sales), 2) AS Revenue
+            FROM fact_order f
+            JOIN dim_product p ON f.Product_ID = p.Product_ID
+            JOIN dim_date d ON f.Date_ID = d.Date_ID
+            {year_filter}
+            GROUP BY p.Product_ID, p.Product_Name
+            ORDER BY Revenue DESC LIMIT 20
+        """))
+
+        with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
+            yearly_df.to_excel(writer, sheet_name="Yearly Summary", index=False)
+            top_products_df.to_excel(writer, sheet_name="Top Products", index=False)
+        return output_path

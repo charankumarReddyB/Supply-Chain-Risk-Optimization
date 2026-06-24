@@ -1,10 +1,13 @@
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required
 from backend.models.database import execute_query
 from backend.services.optimization_service import OptimizationService
+from backend.middleware.auth_middleware import admin_required
 
 inventory_bp = Blueprint("inventory", __name__, url_prefix="/api/inventory")
 
 @inventory_bp.route("", methods=["GET"])
+@jwt_required()
 def get_all_inventory():
     try:
         query = """
@@ -28,6 +31,7 @@ def get_all_inventory():
         return jsonify({"error": f"Failed to fetch inventory: {str(e)}"}), 500
 
 @inventory_bp.route("/replenish", methods=["GET"])
+@jwt_required()
 def get_replenishment_suggestions():
     try:
         suggestions = OptimizationService.get_inventory_replenishment()
@@ -36,6 +40,7 @@ def get_replenishment_suggestions():
         return jsonify({"error": f"Failed to fetch replenishment suggestions: {str(e)}"}), 500
 
 @inventory_bp.route("/<int:inventory_id>", methods=["PUT"])
+@admin_required
 def update_inventory(inventory_id):
     data = request.get_json() or {}
     stock_level = data.get("stock_level")

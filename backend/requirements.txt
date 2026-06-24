@@ -1,12 +1,30 @@
-Flask
-Flask-JWT-Extended
-Flask-Cors
-pymysql
-SQLAlchemy
-pandas
-numpy
-scikit-learn
-reportlab
-openpyxl
-joblib
-python-dotenv
+# =====================================================================
+# Supply Chain Risk Optimization - Backend Requirements
+# =====================================================================
+
+# --- Core Framework ---
+Flask==3.0.3
+Flask-JWT-Extended==4.6.0
+Flask-Cors==4.0.1
+Werkzeug==3.0.3
+
+# --- Database ---
+SQLAlchemy==2.0.31
+PyMySQL==1.1.1
+python-dotenv==1.0.1
+
+# --- Data Processing & ML ---
+pandas==2.2.2
+numpy==1.26.4
+scikit-learn==1.5.1
+joblib==1.4.2
+
+# --- Simulation & Visualization ---
+matplotlib==3.9.0
+
+# --- Reporting ---
+reportlab==4.2.2
+openpyxl==3.1.5
+
+# --- Utilities ---
+python-dateutil==2.9.0
