@@ -80,6 +80,7 @@ class ProductPublic(BaseModel):
     category_id: Optional[int] = None
     category_name: Optional[str] = None
     product_name: str
+    product_price: Optional[float] = None
     product_status: Optional[str] = None
     description: Optional[str] = None
     currency: Optional[str] = None
@@ -114,6 +115,8 @@ class OrderPublic(BaseModel):
     product_id: Optional[int] = None
     product_name: Optional[str] = None
     quantity: Optional[int] = None
+    sales: Optional[float] = None
+    profit: Optional[float] = None
     order_date: Optional[str] = None
     order_status: Optional[str] = None
     payment_type: Optional[str] = None

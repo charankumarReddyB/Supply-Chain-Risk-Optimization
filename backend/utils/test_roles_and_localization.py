@@ -50,9 +50,6 @@ def test_roles_and_localization():
     # 4. Verify user-role access restrictions (403 and error message detail check)
     print("\n4. Testing access restrictions for the standard 'user' role...")
     restricted_endpoints = [
-        ("GET", "dashboard/stats"),
-        ("GET", "dashboard/monthly-sales"),
-        ("GET", "dashboard/supplier-ranking"),
         ("GET", "suppliers/performance"),
         ("GET", "products/high-risk"),
         ("GET", "warehouses/olap/summary"),
@@ -128,7 +125,7 @@ def test_roles_and_localization():
     if len(orders_user_list) > 0:
         sample = orders_user_list[0]
         print(f"  - User Order Sample keys: {list(sample.keys())}")
-        restricted_order_fields = ["sales", "profit", "unit_price", "total_cost", "transportation_cost"]
+        restricted_order_fields = ["unit_price", "total_cost", "transportation_cost"]
         for f in restricted_order_fields:
             if f in sample:
                 print(f"FAIL: Restricted field '{f}' is present in user's order listing.")

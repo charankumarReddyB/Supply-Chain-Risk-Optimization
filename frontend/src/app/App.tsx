@@ -1198,28 +1198,14 @@ const DashboardPage = ({ onNavigate, user }: { onNavigate: (p: Page) => void; us
 
   const loadStats = useCallback(async () => {
     try {
-      const isAdmin = user?.role === "admin";
-      if (isAdmin) {
-        const data = await apiService.dashboard.getStats();
-        setStats(data);
-      } else {
-        const kpis = await apiService.dashboard.getKPIs();
-        const inventory = await apiService.dashboard.getInventoryStatus();
-        setStats({
-          kpis: kpis,
-          inventory_status: inventory,
-          monthly_sales_trend: [],
-          risk_distribution: [],
-          supplier_ranking: [],
-          recent_activities: []
-        });
-      }
+      const data = await apiService.dashboard.getStats();
+      setStats(data);
     } catch (err: any) {
       showToast("error", "Failed to load dashboard statistics");
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     loadStats();
@@ -1476,7 +1462,8 @@ const DashboardPage = ({ onNavigate, user }: { onNavigate: (p: Page) => void; us
 
 type DbSupplier = { supplier_id: number; name: string; email: string; phone: string; rating: number; status: string; };
 
-const SuppliersPage = () => {
+const SuppliersPage = ({ user }: { user: any }) => {
+  const isAdmin = user?.role === "admin";
   const [dbSuppliers, setDbSuppliers] = useState<DbSupplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -1576,9 +1563,11 @@ const SuppliersPage = () => {
                 }`}
               >{r}</button>
             ))}
-            <button onClick={() => setShowAdd(true)} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-colors">
-              <Plus size={13} /> Add Supplier
-            </button>
+            {isAdmin && (
+              <button onClick={() => setShowAdd(true)} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-colors">
+                <Plus size={13} /> Add Supplier
+              </button>
+            )}
           </div>
         </div>
 
@@ -1589,7 +1578,7 @@ const SuppliersPage = () => {
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100">
-                {["ID", "Supplier Name", "Email", "Phone", "Rating", "Status", "Actions"].map((h) => (
+                {["ID", "Supplier Name", "Email", "Phone", "Rating", "Status", isAdmin ? "Actions" : null].filter(Boolean).map((h: any) => (
                   <th key={h} className="text-left py-3 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -1608,12 +1597,14 @@ const SuppliersPage = () => {
                     </div>
                   </td>
                   <td className="py-3.5 px-3"><Badge label={s.status} colorClass={statusColor[s.status] ?? "bg-slate-100 text-slate-600"} /></td>
-                  <td className="py-3.5 px-3">
-                    <div className="flex items-center gap-0.5">
-                      <button onClick={() => setEditSupplier(s)} className="p-1.5 hover:bg-blue-100 rounded-lg text-blue-900 transition-colors" title="Edit"><Edit2 size={13} /></button>
-                      <button onClick={() => setDeleteSupplier(s)} className="p-1.5 hover:bg-red-100 rounded-lg text-red-500 transition-colors" title="Delete"><Trash2 size={13} /></button>
-                    </div>
-                  </td>
+                  {isAdmin && (
+                    <td className="py-3.5 px-3">
+                      <div className="flex items-center gap-0.5">
+                        <button onClick={() => setEditSupplier(s)} className="p-1.5 hover:bg-blue-100 rounded-lg text-blue-900 transition-colors" title="Edit"><Edit2 size={13} /></button>
+                        <button onClick={() => setDeleteSupplier(s)} className="p-1.5 hover:bg-red-100 rounded-lg text-red-500 transition-colors" title="Delete"><Trash2 size={13} /></button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -1646,7 +1637,8 @@ const SuppliersPage = () => {
 type DbProduct = { product_id: number; category_id: number; category_name: string; product_name: string; product_price: number; product_status: string; description: string; };
 type DbInventory = { inventory_id: number; product_id: number; product_name: string; product_price: number; warehouse_name: string; stock_level: number; reorder_point: number; safety_stock: number; lead_time_days: number; };
 
-const InventoryPage = () => {
+const InventoryPage = ({ user }: { user: any }) => {
+  const isAdmin = user?.role === "admin";
   const [dbProducts, setDbProducts] = useState<DbProduct[]>([]);
   const [dbInventory, setDbInventory] = useState<DbInventory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1739,9 +1731,11 @@ const InventoryPage = () => {
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${activeCategory === c ? "bg-blue-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{c}</button>
             ))}
           </div>
-          <button onClick={() => setShowAdd(true)} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-colors flex-shrink-0">
-            <Plus size={13} /> Add Product
-          </button>
+          {isAdmin && (
+            <button onClick={() => setShowAdd(true)} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-colors flex-shrink-0">
+              <Plus size={13} /> Add Product
+            </button>
+          )}
         </div>
 
         <div className="overflow-x-auto">
@@ -1751,7 +1745,7 @@ const InventoryPage = () => {
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100">
-                {["Product ID", "Product Name", "Warehouse", "Stock Qty", "Reorder Point", "Safety Stock", "Lead Time", "Status", "Actions"].map((h) => (
+                {["Product ID", "Product Name", "Warehouse", "Stock Qty", "Reorder Point", "Safety Stock", "Lead Time", "Status", isAdmin ? "Actions" : null].filter(Boolean).map((h: any) => (
                   <th key={h} className="text-left py-3 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -1775,16 +1769,18 @@ const InventoryPage = () => {
                     <td className="py-3.5 px-3 text-xs text-slate-600">{item.safety_stock.toLocaleString()}</td>
                     <td className="py-3.5 px-3 text-xs text-slate-600">{item.lead_time_days}d</td>
                     <td className="py-3.5 px-3"><Badge label={stockStatus} colorClass={statusColor[stockStatus] ?? "bg-slate-100 text-slate-600"} /></td>
-                    <td className="py-3.5 px-3">
-                      <div className="flex items-center gap-0.5">
-                        {prod && (
-                          <>
-                            <button onClick={() => setEditItem({ item, product: prod })} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors" title="Edit Product"><Edit2 size={13} /></button>
-                            <button onClick={() => setDeleteProduct(prod)} className="p-1.5 hover:bg-red-100 rounded-lg text-red-500 transition-colors" title="Delete Product"><Trash2 size={13} /></button>
-                          </>
-                        )}
-                      </div>
-                    </td>
+                    {isAdmin && (
+                      <td className="py-3.5 px-3">
+                        <div className="flex items-center gap-0.5">
+                          {prod && (
+                            <>
+                              <button onClick={() => setEditItem({ item, product: prod })} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors" title="Edit Product"><Edit2 size={13} /></button>
+                              <button onClick={() => setDeleteProduct(prod)} className="p-1.5 hover:bg-red-100 rounded-lg text-red-500 transition-colors" title="Delete Product"><Trash2 size={13} /></button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -1850,7 +1846,8 @@ function getTimeline(order: typeof orders[0]) {
 
 type DbOrder = { order_id: number; customer_id: number; customer_fname: string; customer_lname: string; product_id: number; product_name: string; quantity: number; sales: number; profit: number; order_date: string; order_status: string; payment_type: string; };
 
-const OrdersPage = () => {
+const OrdersPage = ({ user }: { user: any }) => {
+  const isAdmin = user?.role === "admin";
   const [dbOrders, setDbOrders] = useState<DbOrder[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
@@ -1932,9 +1929,11 @@ const OrdersPage = () => {
             title="Orders (from Database)"
             subtitle="Click a row to view details"
             action={
-              <button onClick={() => setShowNewOrder(true)} className="flex items-center gap-1.5 px-3 py-2 bg-blue-900 text-white rounded-xl text-xs font-semibold hover:bg-blue-800 transition-colors">
-                <Plus size={13} /> New Order
-              </button>
+              isAdmin && (
+                <button onClick={() => setShowNewOrder(true)} className="flex items-center gap-1.5 px-3 py-2 bg-blue-900 text-white rounded-xl text-xs font-semibold hover:bg-blue-800 transition-colors">
+                  <Plus size={13} /> New Order
+                </button>
+              )
             }
           />
           <div className="overflow-x-auto">
@@ -2004,21 +2003,24 @@ const OrdersPage = () => {
                 <select
                   value={selectedOrder.order_status}
                   onChange={(e) => handleUpdateStatus(selectedOrder.order_id, e.target.value)}
-                  className="px-2 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 font-semibold text-slate-800"
+                  disabled={!isAdmin}
+                  className="px-2 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 font-semibold text-slate-800 disabled:opacity-75 disabled:cursor-not-allowed"
                 >
                   {["PENDING", "PROCESSING", "COMPLETE", "ON_HOLD", "CLOSED", "CANCELED"].map(st => (
                     <option key={st} value={st}>{st}</option>
                   ))}
                 </select>
               </div>
-              <div className="pt-4 flex gap-2">
-                <button
-                  onClick={() => setConfirmDeleteId(selectedOrder.order_id)}
-                  className="flex-1 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 border border-red-200"
-                >
-                  <Trash2 size={13} /> Delete Order
-                </button>
-              </div>
+              {isAdmin && (
+                <div className="pt-4 flex gap-2">
+                  <button
+                    onClick={() => setConfirmDeleteId(selectedOrder.order_id)}
+                    className="flex-1 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 border border-red-200"
+                  >
+                    <Trash2 size={13} /> Delete Order
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-52 text-slate-300">
@@ -3186,9 +3188,9 @@ export default function App() {
     const isAdmin = user?.role === "admin";
     switch (page) {
       case "dashboard": return <DashboardPage key={pageKey} onNavigate={navigate} user={user} />;
-      case "suppliers": return <SuppliersPage key={pageKey} />;
-      case "inventory": return <InventoryPage key={pageKey} />;
-      case "orders": return <OrdersPage key={pageKey} />;
+      case "suppliers": return <SuppliersPage key={pageKey} user={user} />;
+      case "inventory": return <InventoryPage key={pageKey} user={user} />;
+      case "orders": return <OrdersPage key={pageKey} user={user} />;
       case "risk": 
         if (!isAdmin) return <DashboardPage key={pageKey} onNavigate={navigate} user={user} />;
         return <RiskPage key={pageKey} />;
