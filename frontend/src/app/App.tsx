@@ -746,8 +746,8 @@ const tooltipStyle = {
 
 // ─── Login Page ───────────────────────────────────────────────────────────────
 
-const LoginPage = ({ onLogin }: { onLogin: () => void }) => {
-  const [email, setEmail] = useState("admin@supplychain.com");
+const LoginPage = ({ onLogin }: { onLogin: (user: any) => void }) => {
+  const [email, setEmail] = useState("admin");
   const [password, setPassword] = useState("admin123");
   const [showPass, setShowPass] = useState(false);
   const [remember, setRemember] = useState(false);
@@ -760,9 +760,9 @@ const LoginPage = ({ onLogin }: { onLogin: () => void }) => {
     }
     setLoading(true);
     try {
-      await apiService.auth.login(email.trim(), password);
-      showToast("success", "Welcome back, Admin!");
-      onLogin();
+      const data = await apiService.auth.login(email.trim(), password);
+      showToast("success", `Welcome back, ${data.user.role === 'admin' ? 'Admin' : (data.user.full_name || data.user.username)}!`);
+      onLogin(data.user);
     } catch (err: any) {
       showToast("error", err.message || "Invalid credentials");
     } finally {
@@ -979,12 +979,17 @@ const Sidebar = ({
   page,
   onNavigate,
   onLogout,
+  user,
 }: {
   page: Page;
   onNavigate: (p: Page) => void;
   onLogout: () => void;
+  user: any;
 }) => {
-  const mainItems = navItems.filter((n) => n.group === "main");
+  const isAdmin = user?.role === "admin";
+  const mainItems = navItems.filter(
+    (n) => n.group === "main" && (isAdmin || !["risk", "optimization", "reports"].includes(n.id))
+  );
   const accountItems = navItems.filter((n) => n.group === "account");
 
   return (
@@ -1058,11 +1063,11 @@ const Sidebar = ({
           <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 text-white"
             style={{ background: "linear-gradient(135deg, #3b82f6, #6366f1)" }}
           >
-            AK
+            {(user?.full_name || user?.username || "US").slice(0, 2).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-semibold text-white truncate">Alex Kumar</div>
-            <div className="text-[10px] text-blue-400 truncate">Supply Chain Manager</div>
+            <div className="text-[13px] font-semibold text-white truncate">{user?.full_name || user?.username || "User"}</div>
+            <div className="text-[10px] text-blue-400 truncate capitalize">{user?.role || "user"}</div>
           </div>
         </div>
         <button
@@ -1090,7 +1095,7 @@ const pageTitle: Record<Page, string> = {
   profile: "Profile & Settings",
 };
 
-const TopNav = ({ page, onNavigate, onRefresh }: { page: Page; onNavigate: (p: Page) => void; onRefresh: () => void }) => {
+const TopNav = ({ page, onNavigate, onRefresh, user }: { page: Page; onNavigate: (p: Page) => void; onRefresh: () => void; user: any }) => {
   const [showNotifs, setShowNotifs] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [timeStr, setTimeStr] = useState("");
@@ -1160,7 +1165,7 @@ const TopNav = ({ page, onNavigate, onRefresh }: { page: Page; onNavigate: (p: P
           <button onClick={() => onNavigate("profile")} className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white flex-shrink-0 hover:opacity-90 transition-opacity"
             style={{ background: "linear-gradient(135deg, #3b82f6, #6366f1)" }}
           >
-            AK
+            {(user?.full_name || user?.username || "US").slice(0, 2).toUpperCase()}
           </button>
         </div>
       </div>
@@ -2867,7 +2872,22 @@ interface Notifications {
   deliveryUpdates: boolean;
 }
 
-const ProfilePage = () => {
+const ProfilePage = ({ user, onProfileUpdate }: { user: any; onProfileUpdate: (updatedUser: any) => void }) => {
+  const [fullName, setFullName] = useState(user?.full_name || "");
+  const [email, setEmail] = useState(user?.email || "");
+  const [phone, setPhone] = useState(user?.phone || "");
+  const [location, setLocation] = useState(user?.location || "");
+  const [department, setDepartment] = useState(user?.department || "");
+  const [employeeId, setEmployeeId] = useState(user?.employee_id || "");
+
+  // Password state
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+
   const [notifs, setNotifs] = useState<Notifications>({
     emailAlerts: true,
     smsAlerts: false,
@@ -2888,6 +2908,72 @@ const ProfilePage = () => {
     setNotifs((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const handleSaveProfile = async () => {
+    if (!email.trim()) {
+      showToast("error", "Email Address is required");
+      return;
+    }
+    setSavingProfile(true);
+    try {
+      const res = await apiService.auth.updateProfile({
+        email: email.trim(),
+        full_name: fullName.trim() || undefined,
+        phone: phone.trim() || undefined,
+        location: location.trim() || undefined,
+        department: department.trim() || undefined,
+        employee_id: employeeId.trim() || undefined,
+      });
+      showToast("success", "Profile updated successfully");
+      onProfileUpdate(res.user);
+    } catch (err: any) {
+      showToast("error", err.message || "Failed to update profile");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleUpdatePassword = async () => {
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      showToast("error", "All password fields are required");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showToast("error", "New password and confirmation do not match");
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      await apiService.auth.changePassword(oldPassword, newPassword);
+      showToast("success", "Password updated successfully");
+      setOldPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      showToast("error", err.message || "Failed to update password");
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
+  const handleCancelChanges = () => {
+    setFullName(user?.full_name || "");
+    setEmail(user?.email || "");
+    setPhone(user?.phone || "");
+    setLocation(user?.location || "");
+    setDepartment(user?.department || "");
+    setEmployeeId(user?.employee_id || "");
+    showToast("info", "Changes discarded");
+  };
+
+  const fields = [
+    { label: "Full Name", value: fullName, setter: setFullName, Icon: User },
+    { label: "Email Address", value: email, setter: setEmail, Icon: Mail },
+    { label: "Phone Number", value: phone, setter: setPhone, Icon: Phone },
+    { label: "Location", value: location, setter: setLocation, Icon: MapPin },
+    { label: "Department", value: department, setter: setDepartment, Icon: Building2 },
+    { label: "Employee ID", value: employeeId, setter: setEmployeeId, Icon: Shield },
+  ];
+
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-5">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -2895,11 +2981,13 @@ const ProfilePage = () => {
         <Card className="p-6 text-center">
           <div className="w-20 h-20 rounded-2xl mx-auto flex items-center justify-center text-2xl font-bold text-white mb-4"
             style={{ background: "linear-gradient(135deg, #2563eb, #6366f1)" }}>
-            AK
+            {(user?.full_name || user?.username || "US").slice(0, 2).toUpperCase()}
           </div>
-          <h3 className="text-lg font-bold text-slate-800" style={{ fontFamily: "'Poppins', sans-serif" }}>Alex Kumar</h3>
-          <p className="text-sm text-slate-500 mt-0.5">Supply Chain Manager</p>
-          <p className="text-xs text-blue-600 mt-1 font-medium">admin@chainflow.io</p>
+          <h3 className="text-lg font-bold text-slate-800" style={{ fontFamily: "'Poppins', sans-serif" }}>
+            {user?.full_name || user?.username || "User"}
+          </h3>
+          <p className="text-sm text-slate-500 mt-0.5">{user?.role === "admin" ? "Supply Chain Manager (Admin)" : "Supply Chain Specialist"}</p>
+          <p className="text-xs text-blue-600 mt-1 font-medium">{user?.email}</p>
           <div className="flex justify-center gap-6 mt-5 pt-5 border-t border-slate-100">
             {[{ label: "Orders", value: "2.8K" }, { label: "Suppliers", value: "156" }, { label: "Reports", value: "48" }].map((s) => (
               <div key={s.label}>
@@ -2921,20 +3009,14 @@ const ProfilePage = () => {
         <Card className="p-6 lg:col-span-2">
           <SectionHeader title="Personal Information" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[
-              { label: "Full Name", value: "Alex Kumar", Icon: User },
-              { label: "Email Address", value: "admin@chainflow.io", Icon: Mail },
-              { label: "Phone Number", value: "+1 (555) 234-5678", Icon: Phone },
-              { label: "Location", value: "San Francisco, CA", Icon: MapPin },
-              { label: "Department", value: "Supply Chain Operations", Icon: Building2 },
-              { label: "Employee ID", value: "EMP-2024-0042", Icon: Shield },
-            ].map((f) => (
+            {fields.map((f) => (
               <div key={f.label}>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{f.label}</label>
                 <div className="relative">
                   <f.Icon size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
-                    defaultValue={f.value}
+                    value={f.value}
+                    onChange={(e) => f.setter(e.target.value)}
                     className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25 transition-all"
                   />
                 </div>
@@ -2942,10 +3024,10 @@ const ProfilePage = () => {
             ))}
           </div>
           <div className="flex gap-2 mt-6">
-            <button onClick={() => showToast("success", "Profile information saved successfully")} className="px-5 py-2.5 bg-blue-900 text-white rounded-xl text-sm font-semibold hover:bg-blue-800 transition-colors">
-              Save Changes
+            <button onClick={handleSaveProfile} disabled={savingProfile} className="px-5 py-2.5 bg-blue-900 text-white rounded-xl text-sm font-semibold hover:bg-blue-800 transition-colors disabled:opacity-50">
+              {savingProfile ? "Saving..." : "Save Changes"}
             </button>
-            <button onClick={() => showToast("info", "Changes discarded")} className="px-5 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-200 transition-colors">
+            <button onClick={handleCancelChanges} className="px-5 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-200 transition-colors">
               Cancel
             </button>
           </div>
@@ -2984,21 +3066,21 @@ const ProfilePage = () => {
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Current Password</label>
               <div className="relative">
                 <Lock size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input type="password" defaultValue="currentpass" className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25" />
+                <input type="password" value={oldPassword} onChange={e => setOldPassword(e.target.value)} className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25" />
               </div>
             </div>
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">New Password</label>
               <div className="relative">
                 <Lock size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input type="password" placeholder="Enter new password" className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25" />
+                <input type="password" placeholder="Enter new password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25" />
               </div>
             </div>
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Confirm New Password</label>
               <div className="relative">
                 <Lock size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input type="password" placeholder="Confirm new password" className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25" />
+                <input type="password" placeholder="Confirm new password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/25" />
               </div>
             </div>
             <div className="pt-3 border-t border-slate-100">
@@ -3008,8 +3090,8 @@ const ProfilePage = () => {
               </div>
               <p className="text-xs text-slate-400">Your account is protected with TOTP via authenticator app.</p>
             </div>
-            <button onClick={() => showToast("success", "Password updated successfully")} className="w-full py-2.5 bg-blue-900 text-white rounded-xl text-sm font-semibold hover:bg-blue-800 transition-colors">
-              Update Password
+            <button onClick={handleUpdatePassword} disabled={savingPassword} className="w-full py-2.5 bg-blue-900 text-white rounded-xl text-sm font-semibold hover:bg-blue-800 transition-colors disabled:opacity-50">
+              {savingPassword ? "Updating..." : "Update Password"}
             </button>
           </div>
         </Card>
@@ -3021,7 +3103,8 @@ const ProfilePage = () => {
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [loggedIn, setLoggedIn] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(apiService.auth.isLoggedIn());
+  const [user, setUser] = useState<any>(apiService.auth.getCurrentUser());
   const [page, setPage] = useState<Page>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showMobileNotifs, setShowMobileNotifs] = useState(false);
@@ -3037,11 +3120,30 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (loggedIn) {
+      apiService.auth.getMe()
+        .then((res) => {
+          if (res.user) {
+            setUser(res.user);
+            localStorage.setItem("sc_user", JSON.stringify(res.user));
+          }
+        })
+        .catch(() => {
+          apiService.auth.logout();
+          setLoggedIn(false);
+          setUser(null);
+        });
+    } else {
+      setUser(null);
+    }
+  }, [loggedIn]);
+
   if (!loggedIn) {
     return (
       <>
         <ToastContainer />
-        <LoginPage onLogin={() => setLoggedIn(true)} />
+        <LoginPage onLogin={(userData) => { setUser(userData); setLoggedIn(true); }} />
       </>
     );
   }
@@ -3057,16 +3159,28 @@ export default function App() {
     }, 700);
   };
 
+  const handleProfileUpdate = (updatedUser: any) => {
+    setUser(updatedUser);
+    localStorage.setItem("sc_user", JSON.stringify(updatedUser));
+  };
+
   const renderPage = () => {
+    const isAdmin = user?.role === "admin";
     switch (page) {
       case "dashboard": return <DashboardPage key={pageKey} onNavigate={navigate} />;
       case "suppliers": return <SuppliersPage key={pageKey} />;
       case "inventory": return <InventoryPage key={pageKey} />;
       case "orders": return <OrdersPage key={pageKey} />;
-      case "risk": return <RiskPage key={pageKey} />;
-      case "optimization": return <OptimizationPage key={pageKey} />;
-      case "reports": return <ReportsPage key={pageKey} />;
-      case "profile": return <ProfilePage key={pageKey} />;
+      case "risk": 
+        if (!isAdmin) return <DashboardPage key={pageKey} onNavigate={navigate} />;
+        return <RiskPage key={pageKey} />;
+      case "optimization":
+        if (!isAdmin) return <DashboardPage key={pageKey} onNavigate={navigate} />;
+        return <OptimizationPage key={pageKey} />;
+      case "reports":
+        if (!isAdmin) return <DashboardPage key={pageKey} onNavigate={navigate} />;
+        return <ReportsPage key={pageKey} />;
+      case "profile": return <ProfilePage key={pageKey} user={user} onProfileUpdate={handleProfileUpdate} />;
     }
   };
 
@@ -3096,7 +3210,8 @@ export default function App() {
         <Sidebar
           page={page}
           onNavigate={navigate}
-          onLogout={() => { setLoggedIn(false); showToast("success", "Signed out successfully"); }}
+          onLogout={() => { apiService.auth.logout(); setLoggedIn(false); setUser(null); showToast("success", "Signed out successfully"); }}
+          user={user}
         />
       </div>
 
@@ -3121,7 +3236,7 @@ export default function App() {
 
         {/* Desktop top nav */}
         <div className="hidden lg:block flex-shrink-0">
-          <TopNav page={page} onNavigate={navigate} onRefresh={handleRefresh} />
+          <TopNav page={page} onNavigate={navigate} onRefresh={handleRefresh} user={user} />
         </div>
 
         {/* Page */}

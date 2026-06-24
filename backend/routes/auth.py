@@ -86,6 +86,38 @@ def change_password():
     return jsonify({k: v for k, v in result.items() if k != "status"}), result["status"]
 
 
+@auth_bp.route("/profile", methods=["PUT"])
+@jwt_required()
+def update_profile():
+    """
+    PUT /api/auth/profile
+    Body: { "email": str, "full_name": str, "phone": str, "location": str, "department": str, "employee_id": str }
+    Allows authenticated user to update their own profile details.
+    """
+    user_id = get_jwt_identity()
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip()
+    full_name = data.get("full_name")
+    phone = data.get("phone")
+    location = data.get("location")
+    department = data.get("department")
+    employee_id = data.get("employee_id")
+
+    if not email:
+        return jsonify({"error": "email is required"}), 400
+
+    result = AuthController.update_user_profile(
+        user_id=user_id,
+        email=email,
+        full_name=full_name,
+        phone=phone,
+        location=location,
+        department=department,
+        employee_id=employee_id
+    )
+    return jsonify({k: v for k, v in result.items() if k != "status"}), result["status"]
+
+
 @auth_bp.route("/logout", methods=["POST"])
 @jwt_required()
 def logout():

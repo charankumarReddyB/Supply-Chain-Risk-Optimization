@@ -17,6 +17,11 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     email VARCHAR(100) NOT NULL UNIQUE,
     role VARCHAR(20) DEFAULT 'user',
+    full_name VARCHAR(100) DEFAULT NULL,
+    phone VARCHAR(50) DEFAULT NULL,
+    location VARCHAR(100) DEFAULT NULL,
+    department VARCHAR(100) DEFAULT NULL,
+    employee_id VARCHAR(50) DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_users_username (username),
     INDEX idx_users_email (email)

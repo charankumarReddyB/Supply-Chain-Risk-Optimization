@@ -166,6 +166,38 @@ def test_roles_and_localization():
         sys.exit(1)
     print(f"    Sample Region Cost: {res_cost_reg.json()[0] if len(res_cost_reg.json()) > 0 else 'None'}")
 
+    # 8. Testing profile updating endpoints
+    print("\n8. Testing user profile updates...")
+    res_update_profile = requests.put(f"{base_url}/auth/profile", headers=admin_headers, json={
+        "email": "admin_new@supplychain.com",
+        "full_name": "Administrator Charan",
+        "phone": "+91 99999 88888",
+        "location": "Mumbai, India",
+        "department": "IT Operations",
+        "employee_id": "EMP-ADMIN-001"
+    })
+    print(f"  - PUT /api/auth/profile: Status={res_update_profile.status_code}")
+    if res_update_profile.status_code != 200:
+        print(f"FAIL: Admin profile update failed: {res_update_profile.status_code}")
+        sys.exit(1)
+
+    profile_data = res_update_profile.json()["user"]
+    if profile_data.get("full_name") != "Administrator Charan" or profile_data.get("phone") != "+91 99999 88888":
+        print("FAIL: Profile updates did not return expected values.")
+        sys.exit(1)
+
+    res_me = requests.get(f"{base_url}/auth/me", headers=admin_headers)
+    print(f"  - GET /api/auth/me: Status={res_me.status_code}")
+    if res_me.status_code != 200:
+        print(f"FAIL: GET /api/auth/me failed: {res_me.status_code}")
+        sys.exit(1)
+
+    me_data = res_me.json()["user"]
+    if me_data.get("full_name") != "Administrator Charan":
+        print("FAIL: GET /api/auth/me did not contain updated profile fields.")
+        sys.exit(1)
+    print("  - SUCCESS: User profile update and persistence verified.")
+
     print("\n======================================================================")
     print("             ALL SECURITY, RBAC & TRIMMING TESTS PASSED!              ")
     print("======================================================================")

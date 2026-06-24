@@ -81,6 +81,25 @@ def create_app(config_class=None):
     app.register_blueprint(mc_bp)
     app.register_blueprint(cost_bp)
 
+    # ─── Database Migrations (Profile Columns) ────────────────────────────────
+    with app.app_context():
+        try:
+            from backend.models.database import execute_query
+            for col, col_type in [
+                ("full_name", "VARCHAR(100) DEFAULT NULL"),
+                ("phone", "VARCHAR(50) DEFAULT NULL"),
+                ("location", "VARCHAR(100) DEFAULT NULL"),
+                ("department", "VARCHAR(100) DEFAULT NULL"),
+                ("employee_id", "VARCHAR(50) DEFAULT NULL")
+            ]:
+                try:
+                    execute_query(f"ALTER TABLE users ADD COLUMN {col} {col_type}", fetch=False)
+                except Exception:
+                    # Column already exists or table not ready
+                    pass
+        except Exception as e:
+            app.logger.warning(f"Failed to verify user profile columns: {e}")
+
     # ─── Global Routes ────────────────────────────────────────────────────────
 
     @app.route("/")

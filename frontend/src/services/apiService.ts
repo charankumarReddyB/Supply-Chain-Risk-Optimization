@@ -56,6 +56,14 @@ export const apiService = {
       }));
     },
 
+    updateProfile: async (payload: { email: string; full_name?: string; phone?: string; location?: string; department?: string; employee_id?: string }) => {
+      return handleResponse(await fetch(`${BASE_URL}/auth/profile`, {
+        method: "PUT",
+        headers: getHeaders(),
+        body: JSON.stringify(payload),
+      }));
+    },
+
     getMe: async () => {
       return handleResponse(await fetch(`${BASE_URL}/auth/me`, { headers: getHeaders() }));
     },
