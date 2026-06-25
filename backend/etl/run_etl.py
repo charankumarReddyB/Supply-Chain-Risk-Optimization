@@ -10,8 +10,9 @@ def run_etl_pipeline():
     print("Starting ETL pipeline...")
     
     # 1. Setup Database Tables if they don't exist
-    sql_setup_path = os.path.join("backend", "database_setup.sql")
-    print(f"Running database setup from {sql_setup_path}...")
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+    sql_setup_path = os.path.abspath(os.path.join(current_dir, "..", "database_setup.sql"))
+print(f"Running database setup from {sql_setup_path}...")
     run_sql_file(sql_setup_path)
     
     # 2. Read Dataset CSV
