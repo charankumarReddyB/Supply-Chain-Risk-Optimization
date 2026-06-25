@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: supply-chain-risk-backend
+    env: python
+    buildCommand: pip install -r backend/requirements.txt && python -m backend.utils.init_system
+    startCommand: gunicorn --config backend/gunicorn.conf.py backend.app:app
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: "false"
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false

@@ -10,6 +10,12 @@ db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind
 
 def get_db_connection():
     """Returns a raw PostgreSQL connection."""
+    db_url = os.environ.get("DATABASE_URL")
+    if db_url:
+        return psycopg2.connect(
+            db_url,
+            cursor_factory=psycopg2.extras.RealDictCursor
+        )
     return psycopg2.connect(
         host=Config.DB_HOST,
         port=Config.DB_PORT,
