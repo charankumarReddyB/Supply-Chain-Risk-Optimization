@@ -198,14 +198,14 @@ class AnalyticsController:
         try:
             suppliers = execute_query("""
                 SELECT
-                    s.Supplier_ID,
-                    s.Supplier_Name,
-                    s.Supplier_Rating,
-                    s.Supplier_Status,
-                    COUNT(f.Fact_ID)                   AS Total_Orders,
-                    ROUND(SUM(f.Sales), 2)             AS Total_Revenue,
-                    ROUND(AVG(f.Delivery_Delay), 2)    AS Avg_Delay,
-                    SUM(CASE WHEN f.Risk_Level = 'High' THEN 1 ELSE 0 END) AS High_Risk_Orders
+                    s.Supplier_ID                      AS "Supplier_ID",
+                    s.Supplier_Name                    AS "Supplier_Name",
+                    s.Supplier_Rating                  AS "Supplier_Rating",
+                    s.Supplier_Status                  AS "Supplier_Status",
+                    COUNT(f.Fact_ID)                   AS "Total_Orders",
+                    ROUND(SUM(f.Sales), 2)             AS "Total_Revenue",
+                    ROUND(AVG(f.Delivery_Delay), 2)    AS "Avg_Delay",
+                    SUM(CASE WHEN f.Risk_Level = 'High' THEN 1 ELSE 0 END) AS "High_Risk_Orders"
                 FROM dim_supplier s
                     LEFT JOIN fact_order f ON s.Supplier_ID = f.Supplier_ID
                 GROUP BY s.Supplier_ID, s.Supplier_Name, s.Supplier_Rating, s.Supplier_Status
@@ -214,8 +214,8 @@ class AnalyticsController:
             for row in suppliers:
                 total = row["Total_Orders"] or 1
                 high_risk_rate = (row["High_Risk_Orders"] or 0) / total
-                avg_delay = row["Avg_Delay"] or 0
-                rating = row["Supplier_Rating"] or 0
+                avg_delay = float(row["Avg_Delay"]) if row["Avg_Delay"] is not None else 0.0
+                rating = float(row["Supplier_Rating"]) if row["Supplier_Rating"] is not None else 0.0
 
                 score = round(
                     (rating / 5.0) * 50 -

@@ -42,7 +42,8 @@ class RiskController:
                 total = row["total_orders"] or 1
                 delay_rate = (row["delayed_orders"] or 0) / total
                 high_risk_rate = (row["high_risk_orders"] or 0) / total
-                rating_penalty = max(0, (5.0 - (row["rating"] or 5.0)) / 5.0)
+                rating_val = float(row["rating"]) if row["rating"] is not None else 5.0
+                rating_penalty = max(0.0, (5.0 - rating_val) / 5.0)
 
                 # Composite risk score (0-100): higher = more risky
                 risk_score = round(

@@ -40,7 +40,8 @@ def create_app(config_class=None):
     # ─── Extensions ──────────────────────────────────────────────────────────
 
     # Enable CORS for all /api/* routes
-    allowed_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+    allowed_origins_str = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:5000,https://supplychainrisk.netlify.app")
+    allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",")]
     CORS(app, resources={r"/api/*": {"origins": allowed_origins}}, supports_credentials=True)
 
     # Initialize JWT Manager (with production secret check at runtime startup)
