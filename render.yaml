@@ -2,7 +2,7 @@ services:
   - type: web
     name: supply-chain-risk-backend
     env: python
-    buildCommand: pip install -r backend/requirements.txt && python -m backend.utils.init_system
+    buildCommand: pip install -r backend/requirements.txt && python -u -m backend.utils.init_system
     startCommand: gunicorn --config backend/gunicorn.conf.py backend.app:app
     envVars:
       - key: FLASK_ENV
