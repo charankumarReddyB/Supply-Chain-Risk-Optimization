@@ -43,7 +43,11 @@ def create_app(config_class=None):
     allowed_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
     CORS(app, resources={r"/api/*": {"origins": allowed_origins}}, supports_credentials=True)
 
-    # Initialize JWT Manager
+    # Initialize JWT Manager (with production secret check at runtime startup)
+    jwt_key = app.config.get("JWT_SECRET_KEY")
+    if os.environ.get("FLASK_ENV", "development").lower() == "production":
+        if not jwt_key or jwt_key == "fallback-dev-key-change-in-production":
+            raise RuntimeError("JWT_SECRET_KEY environment variable must be set to a secure key in production.")
     jwt = JWTManager(app)
 
     # JWT Error Handlers
