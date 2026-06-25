@@ -12,8 +12,9 @@ def init_system():
     print("======================================================================")
     
     # 1. Create Schema DDL
-    schema_path = os.path.join("backend", "database_setup.sql")
-    print(f"\nStep 1: Setting up database schema from {schema_path}...")
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+    schema_path = os.path.abspath(os.path.join(current_dir, "..", "database_setup.sql"))
+print(f"\nStep 1: Setting up database schema from {schema_path}...")
     try:
         run_sql_file(schema_path)
         print("Database schema created successfully.")
