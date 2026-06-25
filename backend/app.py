@@ -82,41 +82,72 @@ def create_app(config_class=None):
     app.register_blueprint(mc_bp)
     app.register_blueprint(cost_bp)
 
-    # ─── Database Migrations (Profile Columns) ────────────────────────────────
+    # ─── Database Migrations & Auto-initialization ────────────────────────────
     with app.app_context():
         try:
-            from backend.models.database import execute_query
-            for col, col_type in [
-                ("full_name", "VARCHAR(100) DEFAULT NULL"),
-                ("phone", "VARCHAR(50) DEFAULT NULL"),
-                ("location", "VARCHAR(100) DEFAULT NULL"),
-                ("department", "VARCHAR(100) DEFAULT NULL"),
-                ("employee_id", "VARCHAR(50) DEFAULT NULL")
-            ]:
+            from backend.models.database import get_db_connection, execute_query
+            
+            # Check if database is reachable
+            db_reachable = False
+            try:
+                conn = get_db_connection()
+                conn.close()
+                db_reachable = True
+            except Exception as conn_err:
+                app.logger.warning(f"Database server is unreachable: {conn_err}. Skipping auto-initialization and migrations.")
+
+            if db_reachable:
+                # Check if users table exists in the database
+                table_exists = False
                 try:
-                    execute_query(f"ALTER TABLE users ADD COLUMN {col} {col_type}", fetch=False)
-                except Exception:
-                    # Column already exists or table not ready
-                    pass
-            # Check default admin credentials in production
-            if os.environ.get("FLASK_ENV", "development").lower() == "production":
-                try:
-                    from werkzeug.security import check_password_hash
-                    admin_user = execute_query("SELECT password_hash FROM users WHERE username = 'admin'")
-                    if admin_user:
-                        db_hash = admin_user[0]["password_hash"]
-                        if check_password_hash(db_hash, "admin123"):
-                            app.logger.warning(
-                                "\n"
-                                "======================================================================\n"
-                                "SECURITY WARNING: The 'admin' account is still using the default\n"
-                                "password ('admin123'). Please change it immediately in production!\n"
-                                "======================================================================\n"
-                            )
-                except Exception as err:
-                    app.logger.warning(f"Could not perform default credentials verification check: {err}")
+                    res = execute_query("SELECT 1 FROM pg_tables WHERE tablename = 'users'")
+                    table_exists = len(res) > 0
+                except Exception as check_err:
+                    app.logger.warning(f"Could not check for table existence: {check_err}")
+
+                if not table_exists:
+                    app.logger.info("Database is empty or missing 'users' table. Running auto-initialization & seeding...")
+                    try:
+                        from backend.utils.init_system import init_system
+                        init_system(skip_db_errors=False)
+                        app.logger.info("Database initialization and ETL seeding completed successfully!")
+                        table_exists = True
+                    except Exception as init_err:
+                        app.logger.error(f"Failed to auto-initialize database on startup: {init_err}")
+                else:
+                    app.logger.info("Database is already initialized. Running profile column migrations if needed...")
+                    for col, col_type in [
+                        ("full_name", "VARCHAR(100) DEFAULT NULL"),
+                        ("phone", "VARCHAR(50) DEFAULT NULL"),
+                        ("location", "VARCHAR(100) DEFAULT NULL"),
+                        ("department", "VARCHAR(100) DEFAULT NULL"),
+                        ("employee_id", "VARCHAR(50) DEFAULT NULL")
+                    ]:
+                        try:
+                            execute_query(f"ALTER TABLE users ADD COLUMN {col} {col_type}", fetch=False)
+                        except Exception:
+                            # Column already exists
+                            pass
+
+                # Check default admin credentials in production
+                if os.environ.get("FLASK_ENV", "development").lower() == "production" and table_exists:
+                    try:
+                        from werkzeug.security import check_password_hash
+                        admin_user = execute_query("SELECT password_hash FROM users WHERE username = 'admin'")
+                        if admin_user:
+                            db_hash = admin_user[0]["password_hash"]
+                            if check_password_hash(db_hash, "admin123"):
+                                app.logger.warning(
+                                    "\n"
+                                    "======================================================================\n"
+                                    "SECURITY WARNING: The 'admin' account is still using the default\n"
+                                    "password ('admin123'). Please change it immediately in production!\n"
+                                    "======================================================================\n"
+                                )
+                    except Exception as err:
+                        app.logger.warning(f"Could not perform default credentials verification check: {err}")
         except Exception as e:
-            app.logger.warning(f"Failed to verify user profile columns: {e}")
+            app.logger.warning(f"Failed to verify database status or apply migrations: {e}")
 
     # ─── Global Routes ────────────────────────────────────────────────────────
 

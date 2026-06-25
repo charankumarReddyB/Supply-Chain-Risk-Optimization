@@ -1,21 +1,26 @@
+import sys
 import requests
 import json
 import time
 
 def test_backend_apis():
-    base_url = "http://localhost:5000/api"
+    # Allow target URL configuration via command line or default to localhost
+    target_host = sys.argv[1].rstrip("/") if len(sys.argv) > 1 else "http://localhost:5000"
+    base_url = f"{target_host}/api"
+    
     print("======================================================================")
     print("                     STARTING BACKEND API TESTING                     ")
+    print(f"Target Server: {target_host}")
     print("======================================================================")
     
     # 1. Test server online
     print("1. Testing main status endpoint...")
     try:
-        res = requests.get("http://localhost:5000/")
+        res = requests.get(f"{target_host}/")
         print(f"Status: {res.status_code}, Payload: {res.json()}")
     except Exception as e:
         print(f"Failed to connect to backend server: {e}")
-        print("Please make sure the backend server is running on http://localhost:5000.")
+        print(f"Please make sure the backend server is running on {target_host}.")
         return
 
     # 2. Test User Registration

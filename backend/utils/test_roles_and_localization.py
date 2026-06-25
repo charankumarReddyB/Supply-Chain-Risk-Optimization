@@ -2,9 +2,13 @@ import requests
 import sys
 
 def test_roles_and_localization():
-    base_url = "http://localhost:5000/api"
+    # Allow target URL configuration via command line or default to localhost
+    target_host = sys.argv[1].rstrip("/") if len(sys.argv) > 1 else "http://localhost:5000"
+    base_url = f"{target_host}/api"
+    
     print("======================================================================")
     print("        STARTING SECURITY AND CONTEXT LOCALIZATION TESTS              ")
+    print(f"Target Server: {target_host}")
     print("======================================================================")
 
     # 1. Login as Admin
