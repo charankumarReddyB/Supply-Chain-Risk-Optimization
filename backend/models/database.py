@@ -125,7 +125,7 @@ def execute_many(query, data):
         conn.close()
 
 def run_sql_file(file_path):
-    """Reads a SQL file and executes its statements."""
+    """Reads a SQL file and executes its statements query-by-query."""
     with open(file_path, 'r', encoding='utf-8') as f:
         sql_content = f.read()
     
@@ -141,11 +141,16 @@ def run_sql_file(file_path):
             current_query = []
             
     conn = get_db_connection()
+    conn.autocommit = True
     try:
         with conn.cursor() as cursor:
             for q in queries:
                 if q.strip():
-                    cursor.execute(q)
-            conn.commit()
+                    try:
+                        cursor.execute(q)
+                    except Exception as e:
+                        import logging
+                        logging.getLogger(__name__).warning(f"DDL execution warning: {e} for query: {q.strip().splitlines()[0]}")
     finally:
         conn.close()
+
