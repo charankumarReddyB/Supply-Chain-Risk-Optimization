@@ -136,3 +136,24 @@ def force_init_db():
     except Exception as e:
         import traceback
         return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
+
+
+@etl_bp.route("/debug-db", methods=["GET"])
+def debug_db():
+    try:
+        from backend.models.database import execute_query
+        tables = execute_query("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
+        # Also let's check recent logs or any errors
+        logs = []
+        try:
+            logs = execute_query("SELECT * FROM etl_logs ORDER BY run_at DESC LIMIT 5")
+            for log in logs:
+                if log.get("run_at"):
+                    log["run_at"] = str(log["run_at"])
+        except Exception as log_err:
+            logs = [{"error": str(log_err)}]
+        return jsonify({"tables": [t["table_name"] for t in tables], "etl_logs": logs}), 200
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
+
