@@ -84,12 +84,16 @@ def init_system(skip_db_errors=True):
         print("\nStep 2: Seeding user accounts skipped (database not available).")
         
     # 3. Generate Mock Data
-    print("\nStep 3: Generating mock DataCo CSV dataset...")
-    try:
-        generate_data(18500)
-    except Exception as e:
-        print(f"Error generating mock dataset: {e}")
-        sys.exit(1)
+    from backend.config import Config
+    if os.path.exists(Config.DATASET_PATH):
+        print(f"\nStep 3: Mock dataset already exists at {Config.DATASET_PATH}. Skipping generation.")
+    else:
+        print("\nStep 3: Generating mock DataCo CSV dataset...")
+        try:
+            generate_data(18500)
+        except Exception as e:
+            print(f"Error generating mock dataset: {e}")
+            sys.exit(1)
         
     # 4. Run ETL Pipeline
     if db_available:
@@ -105,13 +109,16 @@ def init_system(skip_db_errors=True):
         print("\nStep 4: ETL pipeline skipped (database not available).")
         
     # 5. Train Machine Learning Model
-    print("\nStep 5: Training Decision Tree risk classifier...")
-    try:
-        train_model()
-        print("ML Model trained and assets exported successfully.")
-    except Exception as e:
-        print(f"Error training ML model: {e}")
-        sys.exit(1)
+    if os.path.exists(Config.MODEL_PATH) and os.path.exists(Config.ENCODER_PATH):
+        print(f"\nStep 5: ML model assets already exist at {Config.MODEL_PATH}. Skipping training.")
+    else:
+        print("\nStep 5: Training Decision Tree risk classifier...")
+        try:
+            train_model()
+            print("ML Model trained and assets exported successfully.")
+        except Exception as e:
+            print(f"Error training ML model: {e}")
+            sys.exit(1)
         
     print("\n======================================================================")
     print("                    INITIALIZATION COMPLETE!                           ")
