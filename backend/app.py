@@ -103,14 +103,21 @@ def create_app(config_class=None):
         try:
             from backend.models.database import get_db_connection, execute_query
             
-            # Check if database is reachable
+            # Check if database is reachable (with retries for database cold starts)
             db_reachable = False
-            try:
-                conn = get_db_connection()
-                conn.close()
-                db_reachable = True
-            except Exception as conn_err:
-                app.logger.warning(f"Database server is unreachable: {conn_err}. Skipping auto-initialization and migrations.")
+            for attempt in range(5):
+                try:
+                    conn = get_db_connection()
+                    conn.close()
+                    db_reachable = True
+                    break
+                except Exception as conn_err:
+                    app.logger.warning(f"Database connection attempt {attempt+1} failed: {conn_err}. Retrying in 3 seconds...")
+                    import time
+                    time.sleep(3)
+            
+            if not db_reachable:
+                app.logger.warning("Database server is unreachable. Skipping auto-initialization and migrations.")
 
             if db_reachable:
                 from backend.models.database import acquire_db_lock, release_db_lock
@@ -123,6 +130,14 @@ def create_app(config_class=None):
                             return True
                         # Check if products table exists and has data
                         res = execute_query("SELECT COUNT(*) as count FROM products")
+                        if not res or res[0]["count"] == 0:
+                            return True
+                        # Check if orders table exists and has data
+                        res = execute_query("SELECT COUNT(*) as count FROM orders")
+                        if not res or res[0]["count"] == 0:
+                            return True
+                        # Check if fact_order table exists and has data
+                        res = execute_query("SELECT COUNT(*) as count FROM fact_order")
                         if not res or res[0]["count"] == 0:
                             return True
                         return False

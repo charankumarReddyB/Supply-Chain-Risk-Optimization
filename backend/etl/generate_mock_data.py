@@ -7,8 +7,9 @@ def generate_data(num_records=18500):
     print(f"Generating {num_records} mock records for DataCo Smart Supply Chain Dataset...")
     
     # Ensure dataset directory exists
-    os.makedirs(os.path.join("backend", "dataset"), exist_ok=True)
-    csv_file_path = os.path.join("backend", "dataset", "DataCoSupplyChainDataset.csv")
+    from backend.config import Config
+    csv_file_path = Config.DATASET_PATH
+    os.makedirs(os.path.dirname(csv_file_path), exist_ok=True)
     
     # Fields matching the original dataset
     headers = [
