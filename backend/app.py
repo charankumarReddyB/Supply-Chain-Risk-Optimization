@@ -113,23 +113,49 @@ def create_app(config_class=None):
                 app.logger.warning(f"Database server is unreachable: {conn_err}. Skipping auto-initialization and migrations.")
 
             if db_reachable:
-                # Check if users table exists in the database
-                table_exists = False
-                try:
-                    res = execute_query("SELECT 1 FROM pg_tables WHERE tablename = 'users'")
-                    table_exists = len(res) > 0
-                except Exception as check_err:
-                    app.logger.warning(f"Could not check for table existence: {check_err}")
+                from backend.models.database import acquire_db_lock, release_db_lock
 
-                if not table_exists:
-                    app.logger.info("Database is empty or missing 'users' table. Running auto-initialization & seeding...")
+                def check_database_needs_init():
                     try:
-                        from backend.utils.init_system import init_system
-                        init_system(skip_db_errors=False)
-                        app.logger.info("Database initialization and ETL seeding completed successfully!")
-                        table_exists = True
-                    except Exception as init_err:
-                        app.logger.error(f"Failed to auto-initialize database on startup: {init_err}")
+                        # Check if users table exists and has data
+                        res = execute_query("SELECT COUNT(*) as count FROM users")
+                        if not res or res[0]["count"] == 0:
+                            return True
+                        # Check if products table exists and has data
+                        res = execute_query("SELECT COUNT(*) as count FROM products")
+                        if not res or res[0]["count"] == 0:
+                            return True
+                        return False
+                    except Exception:
+                        # If any table doesn't exist, we need initialization
+                        return True
+
+                needs_init = check_database_needs_init()
+                if needs_init:
+                    app.logger.info("Database is empty or missing core tables. Attempting to initialize...")
+                    lock_acquired = False
+                    for attempt in range(6):  # Wait up to 30 seconds
+                        lock_acquired = acquire_db_lock()
+                        if lock_acquired:
+                            break
+                        app.logger.info("Database initialization lock is held by another process. Waiting...")
+                        import time
+                        time.sleep(5)
+                        # Re-check if the other process completed initialization
+                        if not check_database_needs_init():
+                            needs_init = False
+                            break
+                    
+                    if lock_acquired and needs_init:
+                        try:
+                            from backend.utils.init_system import init_system
+                            # Call init_system with skip_db_errors=False to fail fast on configuration errors
+                            init_system(skip_db_errors=False)
+                            app.logger.info("Database initialization and ETL seeding completed successfully!")
+                        except Exception as init_err:
+                            app.logger.error(f"Failed to auto-initialize database on startup: {init_err}")
+                        finally:
+                            release_db_lock()
                 else:
                     app.logger.info("Database is already initialized. Running profile column migrations if needed...")
                     for col, col_type in [
@@ -146,7 +172,7 @@ def create_app(config_class=None):
                             pass
 
                 # Check default admin credentials in production
-                if os.environ.get("FLASK_ENV", "development").lower() == "production" and table_exists:
+                if os.environ.get("FLASK_ENV", "development").lower() == "production" and not needs_init:
                     try:
                         from werkzeug.security import check_password_hash
                         admin_user = execute_query("SELECT password_hash FROM users WHERE username = 'admin'")

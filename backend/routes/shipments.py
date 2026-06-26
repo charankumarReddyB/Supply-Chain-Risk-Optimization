@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from backend.models.database import execute_query
+from backend.models.database import execute_query, execute_insert
 from datetime import datetime
 from backend.middleware.auth_middleware import admin_required, get_current_user_role
 from backend.models.pydantic_schemas import ShipmentPublic, ShipmentAdmin
@@ -140,14 +140,11 @@ def update_shipment_tracking(shipment_id):
         if dim_ship:
             shipping_id = dim_ship[0]["Shipping_ID"]
         else:
-            execute_query(
+            shipping_id = execute_insert(
                 """INSERT INTO dim_shipping (Shipping_Mode, Delivery_Status, Shipping_Date_Real_Days, Shipping_Date_Scheduled_Days) 
                    VALUES (%s, %s, %s, %s)""",
-                (shipping_mode, delivery_status, days_shipping_real, scheduled),
-                fetch=False
+                (shipping_mode, delivery_status, days_shipping_real, scheduled)
             )
-            shipping_id_res = execute_query("SELECT LAST_INSERT_ID() as last_id")
-            shipping_id = shipping_id_res[0]["last_id"]
             
         # Recalculate risk level for fact_order
         delay = days_shipping_real - scheduled

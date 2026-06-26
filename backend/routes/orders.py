@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from backend.models.database import execute_query
+from backend.models.database import execute_query, execute_insert
 from datetime import datetime
 from backend.middleware.auth_middleware import admin_required, get_current_user_role
 from backend.models.pydantic_schemas import OrderPublic, OrderAdmin, ShipmentPublic, ShipmentAdmin
@@ -187,14 +187,11 @@ def create_order():
             )
             
         # Create a dim_shipping record for this shipment
-        execute_query(
+        shipping_id = execute_insert(
             """INSERT INTO dim_shipping (Shipping_Mode, Delivery_Status, Shipping_Date_Real_Days, Shipping_Date_Scheduled_Days) 
                VALUES (%s, %s, %s, %s)""",
-            (shipping_mode, "Shipping on time", 0, days_shipment_scheduled),
-            fetch=False
+            (shipping_mode, "Shipping on time", 0, days_shipment_scheduled)
         )
-        shipping_id_res = execute_query("SELECT LAST_INSERT_ID() as last_id")
-        shipping_id = shipping_id_res[0]["last_id"]
         
         # Determine risk level
         risk_level = "Low" # Defaults to low since not shipped yet

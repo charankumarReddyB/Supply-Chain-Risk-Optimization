@@ -253,7 +253,7 @@ def simulate_transportation_delay() -> dict:
         SELECT
             sh.Shipping_Mode,
             COUNT(f.Fact_ID)                                    AS total,
-            SUM(CASE WHEN f.Delivery_Delay > 0 THEN 1 ELSE 0 END) AS delayed,
+            SUM(CASE WHEN f.Delivery_Delay > 0 THEN 1 ELSE 0 END) AS "delayed",
             ROUND(AVG(f.Delivery_Delay), 2)                     AS avg_delay
         FROM fact_order f
             JOIN dim_shipping sh ON f.Shipping_ID = sh.Shipping_ID

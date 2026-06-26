@@ -1,0 +1,31 @@
+# =====================================================================
+# Supply Chain Risk Optimization - Root Fallback Requirements (Python 3.11)
+# =====================================================================
+
+# --- Core Framework ---
+Flask==3.0.3
+Flask-JWT-Extended==4.6.0
+Flask-Cors==4.0.1
+Werkzeug==3.0.3
+gunicorn==22.0.0
+
+# --- Database ---
+SQLAlchemy==2.0.31
+psycopg2-binary==2.9.9
+python-dotenv==1.0.1
+
+# --- Data Processing & ML ---
+pandas==2.1.4
+numpy==1.26.2
+scikit-learn==1.3.2
+joblib==1.3.2
+
+# --- Simulation & Visualization ---
+matplotlib==3.8.2
+
+# --- Reporting ---
+reportlab==4.0.8
+openpyxl==3.1.2
+
+# --- Utilities ---
+python-dateutil==2.8.2

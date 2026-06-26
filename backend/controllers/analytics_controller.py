@@ -155,7 +155,7 @@ class AnalyticsController:
                 SELECT
                     sh.Shipping_Mode,
                     COUNT(f.Fact_ID)                   AS Total_Shipments,
-                    SUM(CASE WHEN f.Delivery_Delay > 0 THEN 1 ELSE 0 END) AS Delayed,
+                    SUM(CASE WHEN f.Delivery_Delay > 0 THEN 1 ELSE 0 END) AS "Delayed",
                     ROUND(AVG(f.Delivery_Delay), 2)    AS Avg_Delay_Days,
                     ROUND(
                         SUM(CASE WHEN f.Delivery_Delay > 0 THEN 1 ELSE 0 END) /

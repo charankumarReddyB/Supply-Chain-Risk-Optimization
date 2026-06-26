@@ -75,7 +75,7 @@ class RiskController:
                 SELECT
                     sh.Shipping_Mode,
                     COUNT(f.Fact_ID)                      AS total_shipments,
-                    SUM(CASE WHEN f.Delivery_Delay > 0 THEN 1 ELSE 0 END) AS delayed,
+                    SUM(CASE WHEN f.Delivery_Delay > 0 THEN 1 ELSE 0 END) AS "delayed",
                     ROUND(AVG(CASE WHEN f.Delivery_Delay > 0 THEN f.Delivery_Delay END), 2) AS avg_delay_days,
                     ROUND(
                         SUM(CASE WHEN f.Delivery_Delay > 0 THEN 1 ELSE 0 END) /

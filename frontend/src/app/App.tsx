@@ -37,7 +37,7 @@ type Page =
 function formatCurrency(value: number, compact = false): string {
   if (compact) {
     if (value >= 10_000_000) return "₹" + (value / 10_000_000).toFixed(1) + "Cr";
-    if (value >= 100_000)    return "₹" + (value / 100_000).toFixed(1) + "L";
+    if (value >= 100_000) return "₹" + (value / 100_000).toFixed(1) + "L";
   }
   return new Intl.NumberFormat("en-IN", {
     style: "currency",

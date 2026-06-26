@@ -207,6 +207,11 @@ export const apiService = {
     list: async () =>
       handleResponse(await fetch(`${BASE_URL}/inventory`, { headers: getHeaders() })),
 
+    create: async (payload: { product_id: number; warehouse_id?: number; stock_level?: number; reorder_point?: number; safety_stock?: number; lead_time_days?: number }) =>
+      handleResponse(await fetch(`${BASE_URL}/inventory`, {
+        method: "POST", headers: getHeaders(), body: JSON.stringify(payload),
+      })),
+
     update: async (id: number, payload: Partial<{ stock_level: number; reorder_point: number; safety_stock: number; lead_time_days: number }>) =>
       handleResponse(await fetch(`${BASE_URL}/inventory/${id}`, {
         method: "PUT", headers: getHeaders(), body: JSON.stringify(payload),

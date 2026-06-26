@@ -77,3 +77,42 @@ def update_inventory(inventory_id):
         return jsonify({"message": "Inventory updated successfully"}), 200
     except Exception as e:
         return jsonify({"error": f"Failed to update inventory: {str(e)}"}), 500
+
+@inventory_bp.route("", methods=["POST"])
+@admin_required
+def create_inventory():
+    data = request.get_json() or {}
+    product_id = data.get("product_id")
+    warehouse_id = data.get("warehouse_id", 1)  # Default warehouse 1
+    stock_level = data.get("stock_level", 0)
+    reorder_point = data.get("reorder_point", 50)
+    safety_stock = data.get("safety_stock", 10)
+    lead_time_days = data.get("lead_time_days", 5)
+
+    if not product_id:
+        return jsonify({"error": "product_id is a required field"}), 400
+
+    try:
+        # Check if product exists
+        prod = execute_query("SELECT product_id FROM products WHERE product_id = %s", (product_id,))
+        if not prod:
+            return jsonify({"error": "Product not found"}), 404
+
+        # Check if inventory already exists for this product in this warehouse
+        existing = execute_query(
+            "SELECT inventory_id FROM inventory WHERE product_id = %s AND warehouse_id = %s",
+            (product_id, warehouse_id)
+        )
+        if existing:
+            return jsonify({"error": f"Inventory for product {product_id} in warehouse {warehouse_id} already exists"}), 409
+
+        execute_query(
+            """INSERT INTO inventory (product_id, warehouse_id, stock_level, reorder_point, safety_stock, lead_time_days)
+               VALUES (%s, %s, %s, %s, %s, %s)""",
+            (product_id, warehouse_id, stock_level, reorder_point, safety_stock, lead_time_days),
+            fetch=False
+        )
+
+        return jsonify({"message": "Inventory record created successfully"}), 201
+    except Exception as e:
+        return jsonify({"error": f"Failed to create inventory: {str(e)}"}), 500

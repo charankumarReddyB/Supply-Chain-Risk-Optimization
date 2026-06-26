@@ -64,7 +64,7 @@ class DashboardController:
                     d.Month_Name  AS month_name,
                     d.Quarter     AS quarter,
                     COUNT(DISTINCT f.Order_ID)   AS total_orders,
-                    COUNT(DISTINCT CASE WHEN f.Delivery_Delay > 0 THEN f.Order_ID END) AS delayed,
+                    COUNT(DISTINCT CASE WHEN f.Delivery_Delay > 0 THEN f.Order_ID END) AS "delayed",
                     COUNT(DISTINCT CASE WHEN f.Delivery_Delay <= 0 THEN f.Order_ID END) AS delivered,
                     ROUND(SUM(f.Sales), 2)        AS revenue,
                     ROUND(SUM(f.Profit), 2)       AS profit

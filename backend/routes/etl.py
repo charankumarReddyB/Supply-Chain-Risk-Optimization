@@ -10,7 +10,7 @@ import time
 import threading
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
-from backend.models.database import execute_query
+from backend.models.database import execute_query, execute_insert
 from backend.middleware.auth_middleware import admin_required
 
 etl_bp = Blueprint("etl", __name__, url_prefix="/api/etl")
@@ -26,12 +26,10 @@ def _run_etl_in_background():
     log_id = None
     try:
         # Insert in-progress log
-        execute_query(
+        log_id = execute_insert(
             "INSERT INTO etl_logs (status, records_processed) VALUES (%s, %s)",
-            ("RUNNING", 0), fetch=False
+            ("RUNNING", 0)
         )
-        log_rows = execute_query("SELECT LAST_INSERT_ID() as lid")
-        log_id = log_rows[0]["lid"] if log_rows else None
 
         run_etl_pipeline()
 
